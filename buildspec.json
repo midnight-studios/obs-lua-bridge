@@ -33,13 +33,13 @@
     },
     "platformConfig": {
         "macos": {
-            "bundleId": "com.example.plugintemplate-for-obs"
+            "bundleId": "com.midnightstudios.obs-lua-bridge"
         }
     },
-    "name": "plugintemplate-for-obs",
-    "displayName": "Plugin Template for OBS",
-    "version": "1.0.0",
-    "author": "Your Name Here",
-    "website": "https://example.com",
+    "name": "obs-lua-bridge",
+    "displayName": "Lua Bridge for OBS",
+    "version": "0.1.0",
+    "author": "Midnight Studios",
+    "website": "https://github.com/midnight-studios/obs-lua-bridge",
     "email": "me@example.com"
 }
