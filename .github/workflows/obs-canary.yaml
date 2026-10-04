@@ -1,0 +1,135 @@
+name: OBS Canary
+run-name: OBS canary build 🐤
+# Weekly: builds the plugin against the newest OBS release (and the obs-deps /
+# Qt versions that release pins), so a new OBS version that breaks the build is
+# noticed before users report it. Linux needs no canary: its CI builds already
+# use the newest OBS from the official PPA. Nothing is committed; the result is
+# a GitHub issue.
+on:
+  schedule:
+    - cron: '17 6 * * 1' # Mondays 06:17 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    name: Check for a New OBS Release 🔎
+    runs-on: ubuntu-24.04
+    outputs:
+      current: ${{ steps.check.outputs.current }}
+      latest: ${{ steps.check.outputs.latest }}
+      newer: ${{ steps.check.outputs.newer }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare buildspec.json with the Latest OBS Release 🔢
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          : Compare with the Latest OBS Release 🔢
+          current="$(jq -r '.dependencies["obs-studio"].version' buildspec.json)"
+          latest="$(gh api repos/obsproject/obs-studio/releases/latest --jq .tag_name)"
+          newer=false
+          if [[ "$(printf '%s\n%s\n' "${current}" "${latest}" | sort -V | tail -n 1)" != "${current}" ]]; then
+            newer=true
+          fi
+          echo "OBS in buildspec.json: ${current}; latest OBS release: ${latest}; newer: ${newer}"
+          {
+            echo "current=${current}"
+            echo "latest=${latest}"
+            echo "newer=${newer}"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build against OBS ${{ needs.check.outputs.latest }} (${{ matrix.target }}) 🧱
+    needs: check
+    if: needs.check.outputs.newer == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            target: x64
+          - os: macos-15
+            target: macos-universal
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Point buildspec.json at OBS ${{ needs.check.outputs.latest }} 🔧
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OBS_VERSION: ${{ needs.check.outputs.latest }}
+        run: |
+          : Point buildspec.json at the new OBS 🔧
+          set -euo pipefail
+          # The obs-deps and Qt versions (with hashes) that this OBS release pins
+          gh api "repos/obsproject/obs-studio/contents/CMakePresets.json?ref=${OBS_VERSION}" \
+            -H 'Accept: application/vnd.github.raw' > obs-presets.json
+          jq '[.. | objects | select(has("prebuilt") and has("qt6"))][0] | {prebuilt, qt6}' obs-presets.json > obs-deps.json
+
+          # Hashes of the OBS source archives the template downloads
+          base="https://github.com/obsproject/obs-studio/archive/refs/tags/${OBS_VERSION}"
+          windows_hash="$(curl -fsSL "${base}.zip" | sha256sum | cut -d ' ' -f 1)"
+          macos_hash="$(curl -fsSL "${base}.tar.gz" | sha256sum | cut -d ' ' -f 1)"
+
+          jq --slurpfile deps obs-deps.json \
+            --arg version "${OBS_VERSION}" --arg windows "${windows_hash}" --arg macos "${macos_hash}" '
+            .dependencies["obs-studio"].version = $version
+            | .dependencies["obs-studio"].hashes = {"macos": $macos, "windows-x64": $windows}
+            | .dependencies.prebuilt = ($deps[0].prebuilt | .hashes.macos = .hashes["macos-universal"])
+            | .dependencies.qt6 = ($deps[0].qt6 | .hashes.macos = .hashes["macos-universal"])
+          ' buildspec.json > buildspec.new.json
+          # (OBS keys its macOS hashes "macos-universal"; this template looks up "macos")
+          mv buildspec.new.json buildspec.json
+          rm obs-presets.json obs-deps.json
+          jq '.dependencies | map_values(.version)' buildspec.json
+
+      - name: Enable Xcode 16.1 🍏
+        if: runner.os == 'macOS'
+        run: sudo xcode-select --switch /Applications/Xcode_16.1.0.app/Contents/Developer
+
+      - name: Build Plugin 🧱
+        uses: ./.github/actions/build-plugin
+        with:
+          target: ${{ matrix.target }}
+          config: RelWithDebInfo
+
+  report:
+    name: Report 📣
+    needs: [check, build]
+    if: always() && needs.check.outputs.newer == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: Open or Update an Issue 📣
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT: ${{ needs.check.outputs.current }}
+          LATEST: ${{ needs.check.outputs.latest }}
+          RESULT: ${{ needs.build.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          : Open or Update an Issue 📣
+          if [[ "${RESULT}" == "success" ]]; then
+            title="OBS ${LATEST} is out: the plugin builds; bump buildspec.json"
+            body="The weekly canary built Lua Bridge against OBS ${LATEST} (and the obs-deps/Qt it pins) on Windows and macOS: **success**. \`buildspec.json\` still pins OBS ${CURRENT}. Bump it (version and hashes; the canary log shows the values) and run the test suites. Run: ${RUN_URL}"
+          else
+            title="Build breaks with OBS ${LATEST}"
+            body="The weekly canary build of Lua Bridge against OBS ${LATEST} **failed** (result: ${RESULT}). \`buildspec.json\` pins OBS ${CURRENT}. Run: ${RUN_URL}"
+          fi
+          existing="$(gh issue list --state open --search "in:title \"OBS ${LATEST}\"" --json number --jq '.[0].number // empty')"
+          if [[ "${existing}" ]]; then
+            gh issue comment "${existing}" --body "${body}"
+          else
+            gh issue create --title "${title}" --body "${body}"
+          fi

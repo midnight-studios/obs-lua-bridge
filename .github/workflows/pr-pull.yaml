@@ -31,3 +31,6 @@ jobs:
     secrets: inherit
     permissions:
       contents: read
+      # check-event reads the PR's labels ("Seeking Testers" builds packages);
+      # without this the label check fails silently and nothing is packaged
+      pull-requests: read
