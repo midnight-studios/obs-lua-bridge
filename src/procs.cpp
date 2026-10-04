@@ -76,8 +76,10 @@ void proc_register(void *, calldata_t *cd)
 void proc_unregister(void *, calldata_t *cd)
 {
 	auto owner = arg(cd, "owner");
-	Result r = registry().unregister_owner(owner);
-	if (r.ok)
+	bool removed = false;
+	Result r = registry().unregister_owner(owner, &removed);
+	// Unregistering an unknown owner is a silent no-op
+	if (removed)
 		obs_log(LOG_INFO, "unregistered owner '%.*s'", (int)owner.size(), owner.data());
 	finish(cd, "luabridge_unregister", owner, r);
 }

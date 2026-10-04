@@ -590,8 +590,10 @@ Result Registry::register_owner(std::string_view owner_id, std::string_view text
 	});
 }
 
-Result Registry::unregister_owner(std::string_view owner_id)
+Result Registry::unregister_owner(std::string_view owner_id, bool *removed)
 {
+	if (removed)
+		*removed = false;
 	return guarded([&] {
 		Result r = check_owner_arg(owner_id);
 		if (!r.ok)
@@ -599,8 +601,11 @@ Result Registry::unregister_owner(std::string_view owner_id)
 
 		std::lock_guard lock(mutex_);
 		auto it = owners_.find(owner_id);
-		if (it != owners_.end())
+		if (it != owners_.end()) {
 			owners_.erase(it);
+			if (removed)
+				*removed = true;
+		}
 		return r;
 	});
 }

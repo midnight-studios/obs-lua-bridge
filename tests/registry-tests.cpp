@@ -292,10 +292,17 @@ void test_unregister()
 {
 	Fixture f;
 	CHECK_OK(f.reg.register_owner("u", R"({"display_name":"U","commands":[{"id":"c"}]})"));
-	CHECK_OK(f.reg.unregister_owner("u"));
+	bool removed = false;
+	CHECK_OK(f.reg.unregister_owner("u", &removed));
+	CHECK(removed);
 	CHECK(f.reg.owner_count() == 0);
-	CHECK_OK(f.reg.unregister_owner("u"));
-	CHECK_OK(f.reg.unregister_owner("never.registered"));
+	CHECK_OK(f.reg.unregister_owner("u", &removed));
+	CHECK(!removed);
+	CHECK_OK(f.reg.unregister_owner("never.registered", &removed));
+	CHECK(!removed);
+	removed = true;
+	CHECK_FAIL(f.reg.unregister_owner("Bad Id", &removed), "invalid owner id");
+	CHECK(!removed);
 	CHECK_FAIL(f.reg.set_state("u", R"({"a":1})", nullptr), "owner not registered");
 	CHECK_FAIL(f.reg.check_emit("u", "evt", "{}"), "owner not registered");
 	CHECK_FAIL(f.reg.check_command("u", "c", "{}"), "owner not registered");

@@ -26,7 +26,7 @@ All procedures are on the global proc handler and set `out bool ok` and `out str
 |---|---|---|---|
 | `luabridge_get_info` | — | `string json` | Plugin info (see below). Use this to detect the plugin. |
 | `luabridge_register` | `string owner`, `string json` | — | Declare the display name, commands and dock controls. Registering again replaces the previous registration. |
-| `luabridge_unregister` | `string owner` | — | Remove everything for this owner. Call it from `script_unload`. Always succeeds for a valid owner ID, even one that isn't registered. |
+| `luabridge_unregister` | `string owner` | — | Remove everything for this owner. Call it from `script_unload`. Always succeeds for a valid owner ID; for an owner that isn't registered it is a silent no-op. |
 | `luabridge_set_state` | `string owner`, `string json` | — | Merge key/values into the owner's state. |
 | `luabridge_emit` | `string owner`, `string event`, `string json` | — | Send a custom event to other scripts (`luabridge_event`) and, from M2, to websocket clients. |
 | `luabridge_heartbeat` | `string owner` | — | Optional liveness ping (see Heartbeat). |

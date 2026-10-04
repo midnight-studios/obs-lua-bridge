@@ -103,8 +103,9 @@ public:
 	// Validates and stores a registration (B7). Replaces an existing one atomically;
 	// on failure the previous registration is kept. Dock problems become warnings.
 	Result register_owner(std::string_view owner, std::string_view json);
-	// Idempotent: unregistering an unknown owner succeeds.
-	Result unregister_owner(std::string_view owner);
+	// Idempotent: unregistering an unknown owner succeeds. *removed (if given) tells
+	// whether a registration actually existed.
+	Result unregister_owner(std::string_view owner, bool *removed = nullptr);
 	// Merges scalar key/values (null deletes). On success *changes_json receives an
 	// object with only the keys whose values changed.
 	Result set_state(std::string_view owner, std::string_view json, std::string *changes_json);
