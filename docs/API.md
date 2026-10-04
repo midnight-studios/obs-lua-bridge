@@ -53,6 +53,12 @@ Every function returns `ok, err` and never throws. **Without the plugin**, every
 - **Compatibility:** if the plugin's `api_version` is missing or older than `bridge.API_VERSION`, the helper treats the plugin as unavailable and logs one warning explaining that the plugin needs updating. Newer plugins work, because API changes within a major version are additive.
 - **Signals:** command and event handlers are connected once per script and disconnected by `shutdown()`. Errors in your handlers are caught and logged, never passed back to OBS.
 
+**Script to script: fire-and-forget commands, replies as events.**
+- `bridge.run_command(owner, command, args)` only tells you whether the other script's command was *accepted*. That other script's handler runs later, and a handler can't return a value. A script also can't read another owner's state.
+- To get an answer, the receiver emits an event (`bridge.emit`), and the sender listens with `bridge.on_event`, matching the reply to its request by an id such as a request number `n`.
+- Never answer with a command from inside a command or event handler. Two scripts would then bounce messages forever.
+- Example: [lua/examples/ping-pong/](../lua/examples/ping-pong/README.md).
+
 **JSON details:**
 - Object keys are sorted, so output is deterministic.
 - Integers are written without a decimal point; other numbers in the shortest form that reads back exactly.

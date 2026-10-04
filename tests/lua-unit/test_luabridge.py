@@ -51,10 +51,12 @@ def main():
                     local fake = dofile('{FAKE}')
                     local tests = dofile('{tests_file}')
                     local function load_helper() return dofile('{HELPER}') end
-                    -- Loads an example as OBS does: script_path() is its folder
+                    -- Loads an example as OBS does: script_path() is the folder
+                    -- the script is in (e.g. examples/ping-pong/ for ping-pong/ping.lua)
                     local function load_example(file)
                         script_properties, script_update = nil, nil
-                        script_path = function() return '{EXAMPLES}' end
+                        local folder = '{EXAMPLES}' .. (file:match('^(.*/)') or '')
+                        script_path = function() return folder end
                         dofile('{EXAMPLES}' .. file)
                     end
                     local ok, err = pcall(tests[name], fake, load_helper, load_example)

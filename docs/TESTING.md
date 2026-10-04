@@ -64,6 +64,19 @@ the client stops.
 | Websocket API | `py tests/websocket/test_vendor.py` | `ws-companion.lua` loaded | 30 s |
 | Examples | `py tests/websocket/test_examples.py` | `scoreboard.lua`, `stopwatch-demo.lua` loaded | 30 s |
 | Rate limiting | `py tests/websocket/test_rate_limit.py` | `ws-companion.lua`, `hello-bridge.lua` loaded | 15 s |
+| Ping-pong example | `py tests/websocket/test_ping_pong.py`, then `--close` | the "LuaBridge PingPong" and "LuaBridge Ping Only" collections (`setup_test_obs.py`) | 1 min |
+
+**Ping-pong checks** (`test_ping_pong.py`). It switches collections by itself and returns to the one it started in.
+1. **ping without pong:**
+   - ping shows "pong not loaded", and the ping number isn't used up;
+   - 20 sends produce 1–2 `owner not registered` log lines (deduplicated).
+2. **Round trip:** 50 sends at 5/s give pong's `count` 50, and ping shows `Last pong: #50`.
+3. **Rapid clicking:**
+   - 300 sends as fast as possible. The websocket rate limit rejects the excess, and every accepted send gives exactly one pong.
+   - **Pass rule:** `GetInfo` keeps answering within 1 s. p99 latency is reported only.
+4. **`--close`:**
+   - closes the test OBS while ping and pong are busy. Same pass rules as shutdown-in-flight.
+   - It restores the current collection in `user.ini` afterwards.
 
 ### Hardening (M5)
 
@@ -120,3 +133,28 @@ These need someone at the OBS window, about 15 minutes in all:
   two separate Score Board sections that don't affect each other.
 - **Confirm dialogs at exit:** open a dock confirm dialog (Score Board → Reset),
   leave it open, and close OBS. OBS must close, and the dialog with it.
+- **Ping-pong: reloading and removing pong** (2 min, in "LuaBridge PingPong" with
+  the dock open):
+  1. Click **Send ping** a few times, then in Tools → Scripts select `pong.lua` →
+     **Reload**, and click again.
+     - **Pass:** ping continues with the next number;
+     - pong's section shows "Pongs: 1" again (its counter restarts);
+     - no error appears in the Script Log.
+  2. Remove `pong.lua` (**–**) and click **Send ping**.
+     - **Pass:** "pong not loaded", and the button's number stays the same.
+  3. Add `pong.lua` back and click.
+     - **Pass:** the ping goes through with that number.
+- **Ping-pong: reloading ping while pong keeps answering** (2 min):
+  - **Setup:** run `py tests/websocket/test_ping_pong.py --drive-pong`. It switches
+    to "LuaBridge PingPong", sends pong a `ping` about 5 times a second (so pong
+    keeps emitting `ponged`), and prints ping's `last_pong` every second.
+  - **Meanwhile:** reload `ping.lua` from Tools → Scripts 5 times.
+  - **Pass:**
+    - no crash;
+    - no Lua errors in the Script Log;
+    - ping's `last_pong` resumes updating after each reload (the printout stops
+      saying "not updating" within a second or two).
+
+    `bridge.shutdown()` in `script_unload` disconnects the event handler, so a
+    reloaded ping never leaves a stale listener behind.
+  - Stop with Ctrl+C.

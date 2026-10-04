@@ -8,6 +8,8 @@ Backs up <config>/basic, then (idempotently):
     level up, as a user would install it) and creates the collections
     "LuaBridge Dup" (instance IDs a and b) and "LuaBridge Conflict" (two copies
     with instance ID x) for duplicates.py;
+  * creates "LuaBridge Fuzz" (fuzz-harness.lua), and "LuaBridge PingPong" /
+    "LuaBridge Ping Only" (the ping-pong example) for test_ping_pong.py;
   * creates the profile "LuaBridge P2" as a copy of "Untitled".
 Only C:/obs-test (or OBS_ROOT) is touched.
 
@@ -101,6 +103,18 @@ def main():
 
     # Switching to this collection runs the procedure fuzzer once
     write_collection(base, "LuaBridge Fuzz", "LuaBridge_Fuzz.json", [script(ROOT / "tests/lua/fuzz-harness.lua")])
+
+    # Ping-pong example (test_ping_pong.py): both halves, and ping without pong
+    ping_pong = ROOT / "lua/examples/ping-pong"
+    write_collection(base, "LuaBridge PingPong", "LuaBridge_PingPong.json", [
+        script(ROOT / "tests/websocket/ws-companion.lua"),
+        script(ping_pong / "ping.lua"),
+        script(ping_pong / "pong.lua"),
+    ])
+    write_collection(base, "LuaBridge Ping Only", "LuaBridge_Ping_Only.json", [
+        script(ROOT / "tests/websocket/ws-companion.lua"),
+        script(ping_pong / "ping.lua"),
+    ])
 
     profile = BASIC / "profiles" / "LuaBridge_P2"
     if not profile.exists():
