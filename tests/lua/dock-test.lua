@@ -7,7 +7,8 @@
 --   [dock-test.lua] command <id> origin=<origin> args=<json>
 -- and shown in the "last command" label, so clicks can be checked in the log.
 --
--- The script heartbeats every 5 s. The Stop/Resume heartbeat buttons are in
+-- The script heartbeats every 5 s; the "Last heartbeat" label shows the time of
+-- the latest one (dock only, not logged). The Stop/Resume heartbeat buttons are in
 -- this script's properties (Tools > Scripts > select it), not in the dock,
 -- because a stale section disables its dock controls. About 30 s after
 -- stopping, the section greys out and offers Remove.
@@ -36,14 +37,22 @@ local REGISTRATION = '{"display_name":"Dock Test","commands":['
 	.. '{"type":"toggle","bind":"enabled","command":"set_enabled"},'
 	.. '{"type":"separator"},'
 	.. '{"type":"label","bind":"message"},'
-	.. '{"type":"label","bind":"last_command"}'
+	.. '{"type":"label","bind":"last_command"},'
+	.. '{"type":"label","bind":"last_heartbeat"}'
 	.. "]}"
 
 local connected = false
 local heartbeat_running = false
 
 -- Script-side state, republished whenever the owner (re-)registers
-local state = { display = "stopped", total = 0, enabled = false, message = "", last_command = "" }
+local state = {
+	display = "stopped",
+	total = 0,
+	enabled = false,
+	message = "",
+	last_command = "",
+	last_heartbeat = "Last heartbeat: none yet",
+}
 
 local function log(msg)
 	obs.script_log(obs.LOG_INFO, msg)
@@ -70,6 +79,7 @@ local function publish_state()
 	obs.obs_data_set_bool(data, "enabled", state.enabled)
 	obs.obs_data_set_string(data, "message", state.message)
 	obs.obs_data_set_string(data, "last_command", state.last_command)
+	obs.obs_data_set_string(data, "last_heartbeat", state.last_heartbeat)
 	local ok, err = call("luabridge_set_state", { owner = OWNER, json = obs.obs_data_get_json(data) })
 	obs.obs_data_release(data)
 	if not ok then
@@ -92,7 +102,11 @@ local function heartbeat()
 	local ok, err = call("luabridge_heartbeat", { owner = OWNER })
 	if not ok then
 		obs.script_log(obs.LOG_WARNING, "heartbeat failed: " .. tostring(err))
+		return
 	end
+	-- Shown in the dock only (not logged), so heartbeats can be seen arriving and stopping
+	state.last_heartbeat = "Last heartbeat: " .. os.date("%H:%M:%S")
+	call("luabridge_set_state", { owner = OWNER, json = '{"last_heartbeat":"' .. state.last_heartbeat .. '"}' })
 end
 
 local function start_heartbeat()
