@@ -68,6 +68,40 @@ target_sources(
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
+# Ship the Lua helper and examples (lua/) in the plugin's data folder, in the
+# same layout on every platform (<data>/lua/luabridge.lua, <data>/lua/examples/),
+# so the examples' dofile(script_path() .. "../luabridge.lua") works as shipped.
+# Also ship the license files with the plugin.
+set(_license_files "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" "${CMAKE_CURRENT_SOURCE_DIR}/THIRD-PARTY-NOTICES.md")
+if(OS_WINDOWS)
+  install(DIRECTORY lua/ DESTINATION "${CMAKE_PROJECT_NAME}/data/lua")
+  install(FILES ${_license_files} DESTINATION "${CMAKE_PROJECT_NAME}")
+  install(FILES packaging/windows/INSTALL.txt DESTINATION .)
+  add_custom_command(
+    TARGET ${CMAKE_PROJECT_NAME}
+    POST_BUILD
+    COMMAND
+      "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lua"
+      "${CMAKE_CURRENT_BINARY_DIR}/rundir/$<CONFIG>/${CMAKE_PROJECT_NAME}/lua"
+    COMMENT "Copy lua/ to rundir"
+    VERBATIM
+  )
+elseif(OS_MACOS)
+  file(GLOB_RECURSE _lua_files "${CMAKE_CURRENT_SOURCE_DIR}/lua/*")
+  foreach(_file IN LISTS _lua_files)
+    cmake_path(RELATIVE_PATH _file BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
+    cmake_path(GET _relative PARENT_PATH _relative)
+    target_sources(${CMAKE_PROJECT_NAME} PRIVATE "${_file}")
+    set_property(SOURCE "${_file}" PROPERTY MACOSX_PACKAGE_LOCATION "Resources/${_relative}")
+  endforeach()
+  foreach(_file IN LISTS _license_files)
+    target_add_resource(${CMAKE_PROJECT_NAME} "${_file}")
+  endforeach()
+else()
+  install(DIRECTORY lua/ DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/obs/obs-plugins/${CMAKE_PROJECT_NAME}/lua")
+  install(FILES ${_license_files} DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/doc/${CMAKE_PROJECT_NAME}")
+endif()
+
 option(ENABLE_FUZZING "Build the libFuzzer + AddressSanitizer target for the core library (MSVC)" OFF)
 if(ENABLE_FUZZING)
   # Core sources compiled again with sanitizers, so the whole core is instrumented

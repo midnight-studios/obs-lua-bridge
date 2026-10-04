@@ -1,0 +1,44 @@
+name: Unit Tests
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  unit-tests:
+    name: Unit Tests 🧪 (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build C++ Unit Tests 🧱
+        run: |
+          : Build C++ Unit Tests 🧱
+          cmake -S tests -B build_tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_tests --config Release --parallel
+
+      - name: Run C++ Unit Tests 🧪
+        run: |
+          : Run C++ Unit Tests 🧪
+          ctest --test-dir build_tests -C Release --output-on-failure
+
+      # Not on macOS: lupa's Apple Silicon wheel has no LuaJIT 2.1 runtime, and
+      # the runner refuses to fall back to another Lua. The Lua code is pure Lua
+      # on the same LuaJIT, so Ubuntu and Windows cover it.
+      - uses: actions/setup-python@v5
+        if: runner.os != 'macOS'
+        with:
+          python-version: '3.12'
+
+      - name: Run Lua Unit Tests (LuaJIT 2.1) 🌙
+        if: runner.os != 'macOS'
+        run: |
+          : Run Lua Unit Tests 🌙
+          python -m pip install --quiet lupa
+          python tests/lua-unit/test_luabridge.py

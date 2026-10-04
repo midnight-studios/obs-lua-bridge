@@ -22,7 +22,10 @@
 !lua
 !tests
 !tools
+!packaging
 !CLAUDE.md
+!CHANGELOG.md
+!THIRD-PARTY-NOTICES.md
 
 # Exclude lock files
 *.lock.json

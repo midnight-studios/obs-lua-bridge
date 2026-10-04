@@ -95,7 +95,7 @@ All procedures are on the global proc handler and set `out bool ok` and `out str
 ### `luabridge_get_info` JSON
 
 ```json
-{"api_version":1,"plugin_version":"0.1.0","obs_version":"32.2.2","capabilities":{"commands":true,"events":true,"heartbeat":true,"run_command":true,"state":true,"websocket":true}}
+{"api_version":1,"plugin_version":"0.9.0","obs_version":"32.2.2","capabilities":{"commands":true,"events":true,"heartbeat":true,"run_command":true,"state":true,"websocket":true}}
 ```
 
 - `capabilities` is an object of flags. It isn't an array because the same JSON is sent over obs-websocket, which can't carry arrays of strings.

@@ -19,9 +19,18 @@ jobs:
     permissions:
       contents: read
 
+  unit-tests:
+    name: Unit Tests 🧪
+    uses: ./.github/workflows/tests.yaml
+    permissions:
+      contents: read
+
   build-project:
     name: Build Project 🧱
     uses: ./.github/workflows/build-project.yaml
     secrets: inherit
     permissions:
       contents: read
+      # check-event reads the PR's labels ("Seeking Testers" builds packages);
+      # without this the label check fails silently and nothing is packaged
+      pull-requests: read

@@ -1,7 +1,24 @@
 # Testing Lua Bridge for OBS
 
 Every test suite, how to run it, how long it takes, and what needs a person.
-CI only builds and checks formatting; everything below runs locally.
+
+**In CI** (`.github/workflows/tests.yaml`, on every PR and push):
+- **C++ unit tests:** on Windows, macOS and Ubuntu. `tests/CMakeLists.txt` is a standalone build of the core
+  library that needs no OBS: `cmake -S tests -B build_tests && cmake --build build_tests --config Release &&
+  ctest --test-dir build_tests -C Release`.
+- **Lua unit tests:** on Windows and Ubuntu. They don't run on macOS because lupa's Apple Silicon wheel has no
+  LuaJIT.
+
+Everything else below runs locally against a test OBS.
+
+**Install test of a Windows package without touching ProgramData:**
+- A portable OBS ignores `C:\ProgramData\obs-studio\plugins`. It still reads `OBS_PLUGINS_PATH`, the plugin's
+  `bin\64bit` folder, and `OBS_PLUGINS_DATA_PATH`, a folder containing `obs-lua-bridge` as the package's `data`
+  folder, for example through a junction.
+- So the package can be tested unmodified in a clean portable OBS, with the same `bin/64bit` + `data` split
+  that ProgramData uses.
+- A fresh portable OBS reports `Number of memory leaks: 1` on its very first start, with or without plugins.
+  Judge leaks from the second start on.
 
 ## The test OBS
 

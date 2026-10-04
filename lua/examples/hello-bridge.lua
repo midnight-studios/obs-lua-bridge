@@ -1,5 +1,8 @@
 -- hello-bridge.lua: the smallest Lua Bridge for OBS example
 --
+-- SPDX-License-Identifier: MIT
+-- Copyright (c) 2026 Midnight Studios. See lua/LICENSE (MIT); the plugin itself is GPL-2.0-or-later.
+--
 -- Registers the owner "hello" with a "ping" command and a small dock section
 -- (Docks > Lua Bridge): a Ping button and the time of the last ping. Clicking
 -- Ping logs "ping received" and updates the label. Without the plugin the
