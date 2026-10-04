@@ -1,13 +1,15 @@
--- hello-bridge.lua: Lua Bridge for OBS round-trip check (Milestone M0)
+-- hello-bridge.lua: minimal Lua Bridge for OBS example
 --
--- At load, asks the plugin for its info and connects to the luabridge_command
--- signal. Logs "ping received" when the Tools menu item
--- "Lua Bridge: Send test ping" is clicked. Without the plugin installed, the
--- script logs that and otherwise does nothing.
+-- At load, asks the plugin for its info, registers the owner "hello" with a
+-- "ping" command, and connects to the luabridge_command signal. Logs
+-- "ping received" when the Tools menu item "Lua Bridge: Send test ping
+-- (temporary)" is clicked. Without the plugin installed, the script logs that
+-- and otherwise does nothing.
 
 local obs = obslua
 
 local OWNER = "hello"
+local REGISTRATION = '{"display_name":"Hello Bridge","commands":[{"id":"ping","label":"Ping"}]}'
 
 local connected = false
 
@@ -15,22 +17,19 @@ local function log(msg)
 	obs.script_log(obs.LOG_INFO, msg)
 end
 
--- Returns the info JSON string, or nil plus a reason if the plugin is absent.
-local function get_info()
+-- Calls a luabridge_* procedure with string arguments.
+-- Returns ok, error, json (json is only set by luabridge_get_info).
+local function call(proc, args)
 	local cd = obs.calldata_create()
-	local found = obs.proc_handler_call(obs.obs_get_proc_handler(), "luabridge_get_info", cd)
+	for name, value in pairs(args or {}) do
+		obs.calldata_set_string(cd, name, value)
+	end
+	local found = obs.proc_handler_call(obs.obs_get_proc_handler(), proc, cd)
 	local ok = found and obs.calldata_bool(cd, "ok")
+	local err = found and obs.calldata_string(cd, "error") or ("procedure " .. proc .. " not found")
 	local json = obs.calldata_string(cd, "json")
-	local err = obs.calldata_string(cd, "error")
 	obs.calldata_destroy(cd)
-
-	if not found then
-		return nil, "procedure luabridge_get_info not found"
-	end
-	if not ok then
-		return nil, err
-	end
-	return json
+	return ok, err, json
 end
 
 local function on_command(cd)
@@ -51,14 +50,14 @@ local function on_command(cd)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: M0 round-trip check. Logs the plugin info at load and "
-		.. "\"ping received\" when you click Tools > Lua Bridge: Send test ping."
+	return "Lua Bridge for OBS: minimal example. Logs the plugin info at load and "
+		.. "\"ping received\" when you click Tools > Lua Bridge: Send test ping (temporary)."
 end
 
 function script_load(settings)
-	local info, reason = get_info()
-	if not info then
-		log("Lua Bridge plugin not available (" .. tostring(reason) .. "); running without it")
+	local ok, err, info = call("luabridge_get_info")
+	if not ok then
+		log("Lua Bridge plugin not available (" .. tostring(err) .. "); running without it")
 		return
 	end
 
@@ -67,11 +66,21 @@ function script_load(settings)
 	-- The signal only exists when the plugin is loaded, so connect only then
 	obs.signal_handler_connect(obs.obs_get_signal_handler(), "luabridge_command", on_command)
 	connected = true
-	log("connected to luabridge_command")
+
+	ok, err = call("luabridge_register", { owner = OWNER, json = REGISTRATION })
+	if ok then
+		log("registered as '" .. OWNER .. "'")
+	else
+		log("registration failed: " .. tostring(err))
+	end
 end
 
 function script_unload()
 	if connected then
+		local ok, err = call("luabridge_unregister", { owner = OWNER })
+		if not ok then
+			obs.script_log(obs.LOG_WARNING, "unregister failed: " .. tostring(err))
+		end
 		obs.signal_handler_disconnect(obs.obs_get_signal_handler(), "luabridge_command", on_command)
 		connected = false
 	end

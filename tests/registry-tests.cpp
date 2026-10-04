@@ -1,0 +1,475 @@
+/*
+Lua Bridge for OBS
+Copyright (C) 2026 Midnight Studios
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along
+with this program. If not, see <https://www.gnu.org/licenses/>
+*/
+
+// Unit tests for the registry (no OBS needed). Run with ctest or directly;
+// exits non-zero if any check fails.
+
+#include "registry.hpp"
+
+#include <cstdio>
+#include <memory>
+#include <string>
+#include <thread>
+#include <vector>
+
+using namespace luabridge;
+using namespace std::chrono_literals;
+
+namespace {
+
+int checks = 0;
+int failures = 0;
+
+void report(bool passed, const char *file, int line, const std::string &message)
+{
+	++checks;
+	if (!passed) {
+		++failures;
+		std::fprintf(stderr, "%s:%d: %s\n", file, line, message.c_str());
+	}
+}
+
+#define CHECK(cond) report((cond), __FILE__, __LINE__, "CHECK failed: " #cond)
+
+#define CHECK_OK(expr)                                                                       \
+	do {                                                                                 \
+		Result r_ = (expr);                                                          \
+		report(r_.ok, __FILE__, __LINE__, std::string("expected ok: " #expr " -> ") + r_.error); \
+	} while (0)
+
+#define CHECK_FAIL(expr, substr)                                                                 \
+	do {                                                                                     \
+		Result r_ = (expr);                                                              \
+		report(!r_.ok && r_.error.find(substr) != std::string::npos, __FILE__, __LINE__, \
+		       std::string("expected failure containing '") + (substr) +                \
+			       "': " #expr " -> " + (r_.ok ? std::string("ok") : r_.error));     \
+	} while (0)
+
+// Registry with a controllable clock
+struct Fixture {
+	std::shared_ptr<Clock::time_point> now = std::make_shared<Clock::time_point>(Clock::time_point{} + 1h);
+	Registry reg{[now = now] {
+		return *now;
+	}};
+
+	void advance(Clock::duration d) { *now += d; }
+};
+
+std::string repeat(char c, std::size_t n)
+{
+	return std::string(n, c);
+}
+
+std::string with_commands(int count)
+{
+	std::string s = R"({"display_name":"T","commands":[)";
+	for (int i = 0; i < count; ++i)
+		s += (i ? "," : "") + std::string(R"({"id":"c)") + std::to_string(i) + "\"}";
+	return s + "]}";
+}
+
+std::string with_dock(const std::string &dock)
+{
+	return R"({"display_name":"T","commands":[{"id":"go","args":{"n":"int"}}],"dock":)" + dock + "}";
+}
+
+const char *b7_example = R"({
+  "display_name": "Stopwatch",
+  "commands": [
+    { "id": "start",  "label": "Start",  "description": "Start the timer" },
+    { "id": "pause",  "label": "Pause" },
+    { "id": "reset",  "label": "Reset",  "confirm": true },
+    { "id": "add",    "label": "+",      "args": { "seconds": "int" } }
+  ],
+  "dock": [
+    { "type": "label",  "bind": "display",   "style": "large" },
+    { "type": "row",    "items": [
+        { "type": "button", "command": "start" },
+        { "type": "button", "command": "pause" },
+        { "type": "button", "command": "reset" } ] },
+    { "type": "number", "id": "add_secs", "min": 1, "max": 3600, "default": 1 },
+    { "type": "button", "command": "add", "args_from": { "seconds": "add_secs" } },
+    { "type": "separator" }
+  ]
+})";
+
+bool has_warning(const Result &r, const std::string &substr)
+{
+	for (const auto &w : r.warnings) {
+		if (w.find(substr) != std::string::npos)
+			return true;
+	}
+	return false;
+}
+
+void test_id_validation()
+{
+	CHECK(is_valid_owner_id("stopwatch"));
+	CHECK(is_valid_owner_id("a.b-c_1"));
+	CHECK(is_valid_owner_id("grumpydog.scoreboard"));
+	CHECK(is_valid_owner_id(repeat('a', 64)));
+	CHECK(!is_valid_owner_id(""));
+	CHECK(!is_valid_owner_id(repeat('a', 65)));
+	CHECK(!is_valid_owner_id("Stopwatch"));
+	CHECK(!is_valid_owner_id("a b"));
+	CHECK(!is_valid_owner_id("\xc3\xa9"));
+	CHECK(!is_valid_owner_id("../x"));
+
+	CHECK(is_valid_command_id("add_secs"));
+	CHECK(is_valid_command_id(repeat('c', 64)));
+	CHECK(!is_valid_command_id(repeat('c', 65)));
+	CHECK(!is_valid_command_id("a.b"));
+	CHECK(!is_valid_command_id("a-b"));
+	CHECK(!is_valid_command_id("Start"));
+
+	CHECK(is_valid_state_key("Display.Main_1"));
+	CHECK(is_valid_state_key(repeat('K', 64)));
+	CHECK(!is_valid_state_key(repeat('K', 65)));
+	CHECK(!is_valid_state_key("a-b"));
+	CHECK(!is_valid_state_key(""));
+
+	CHECK(is_valid_event_name("score.changed"));
+	CHECK(is_valid_event_name(repeat('e', 64)));
+	CHECK(!is_valid_event_name(repeat('e', 65)));
+	CHECK(!is_valid_event_name("bad event"));
+}
+
+void test_register()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("minimal", R"({"display_name":"Minimal"})"));
+
+	Result r = f.reg.register_owner("stopwatch", b7_example);
+	CHECK(r.ok);
+	CHECK(r.warnings.empty());
+
+	CHECK_FAIL(f.reg.register_owner("a", R"({})"), "display_name");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":""})"), "display_name");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":")" + repeat('x', 129) + "\"}"), "display_name");
+	CHECK_OK(f.reg.register_owner("a", R"({"display_name":")" + repeat('x', 128) + "\"}"));
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":5})"), "display_name");
+	CHECK_FAIL(f.reg.register_owner("Bad", R"({"display_name":"x"})"), "invalid owner id");
+}
+
+void test_json_size_and_parsing()
+{
+	Fixture f;
+	std::string head = R"({"display_name":"x","pad":")";
+	std::string tail = "\"}";
+	std::string exact = head + repeat('a', limits::max_json_bytes - head.size() - tail.size()) + tail;
+	CHECK(exact.size() == limits::max_json_bytes);
+	CHECK_OK(f.reg.register_owner("big", exact));
+
+	std::string over = head + repeat('a', limits::max_json_bytes + 1 - head.size() - tail.size()) + tail;
+	CHECK(over.size() == limits::max_json_bytes + 1);
+	CHECK_FAIL(f.reg.register_owner("big", over), "json exceeds 65536 bytes");
+
+	CHECK_FAIL(f.reg.register_owner("a", "{not json"), "invalid JSON");
+	CHECK_FAIL(f.reg.register_owner("a", "[1,2]"), "must be an object");
+	CHECK_FAIL(f.reg.register_owner("a", "\"str\""), "must be an object");
+	CHECK_FAIL(f.reg.register_owner("a", "{\"display_name\":\"\xff\xfe\"}"), "invalid JSON");
+	CHECK_OK(f.reg.register_owner("a", "{\"display_name\":\"caf\xc3\xa9 \xf0\x9f\x8e\xae\"}"));
+}
+
+void test_command_limits()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("a", with_commands(64)));
+	CHECK_FAIL(f.reg.register_owner("a", with_commands(65)), "too many commands (max 64)");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":"T","commands":[{"id":"x"},{"id":"x"}]})"),
+		   "duplicate command 'x'");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":"T","commands":[{"id":"x","args":{"v":"float"}}]})"),
+		   "must have type");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":"T","commands":[{"id":"Bad"}]})"), "commands[0]");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":"T","commands":[{"id":"x","confirm":"yes"}]})"),
+		   "confirm");
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":"T","commands":{}})"), "commands must be an array");
+
+	std::string args;
+	for (int i = 0; i < 17; ++i)
+		args += (i ? "," : "") + std::string("\"a") + std::to_string(i) + "\":\"int\"";
+	CHECK_FAIL(f.reg.register_owner("a", R"({"display_name":"T","commands":[{"id":"x","args":{)" + args + "}}]}"),
+		   "too many args (max 16)");
+}
+
+void test_owner_limit()
+{
+	Fixture f;
+	for (std::size_t i = 0; i < limits::max_owners; ++i)
+		CHECK_OK(f.reg.register_owner("o" + std::to_string(i), R"({"display_name":"x"})"));
+	CHECK(f.reg.owner_count() == limits::max_owners);
+	CHECK_FAIL(f.reg.register_owner("extra", R"({"display_name":"x"})"), "too many owners (max 128)");
+	CHECK_OK(f.reg.register_owner("o0", R"({"display_name":"again"})"));
+	CHECK_OK(f.reg.unregister_owner("o5"));
+	CHECK_OK(f.reg.register_owner("extra", R"({"display_name":"x"})"));
+	CHECK(f.reg.owner_count() == limits::max_owners);
+}
+
+void test_reregister()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S","commands":[{"id":"a"}]})"));
+	CHECK_OK(f.reg.set_state("s", R"({"x":1})", nullptr));
+
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S","commands":[{"id":"b"}]})"));
+	CHECK_FAIL(f.reg.check_command("s", "a", ""), "unknown command 'a'");
+	CHECK_OK(f.reg.check_command("s", "b", ""));
+	std::string changes;
+	CHECK_OK(f.reg.set_state("s", R"({"x":1})", &changes));
+	CHECK(changes == R"({"x":1})"); // state was cleared by re-registering
+
+	// A failed re-registration keeps the previous one
+	CHECK_FAIL(f.reg.register_owner("s", "{broken"), "invalid JSON");
+	CHECK_FAIL(f.reg.register_owner("s", with_commands(65)), "too many commands");
+	CHECK_OK(f.reg.check_command("s", "b", ""));
+	CHECK_OK(f.reg.set_state("s", R"({"x":1})", &changes));
+	CHECK(changes == "{}");
+}
+
+void test_dock()
+{
+	Fixture f;
+	Result r = f.reg.register_owner("d", with_dock(R"([{"type":"slider"},{"type":"separator"}])"));
+	CHECK(r.ok);
+	CHECK(r.warnings.size() == 1);
+	CHECK(has_warning(r, "dock[0]: unknown control type 'slider'; skipped"));
+
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"button","command":"nope"}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "command 'nope' is not declared"));
+
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"row","items":[{"type":"row","items":[]}]}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "dock[0].items[0]: rows cannot be nested"));
+
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"number","id":"n","min":10,"max":1}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "min <= default <= max"));
+
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"label"}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "invalid or missing bind"));
+
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"button","command":"go","args_from":{"n":"missing"}}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "must name a number or text control"));
+
+	r = f.reg.register_owner(
+		"d", with_dock(R"([{"type":"number","id":"v"},{"type":"button","command":"go","args_from":{"n":"v"}},)"
+			       R"({"type":"toggle","bind":"on","command":"go"},{"type":"text","id":"t"}])"));
+	CHECK(r.ok);
+	CHECK(r.warnings.empty());
+
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"number","id":"v"},{"type":"text","id":"v"}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "duplicate id 'v'"));
+
+	std::string controls;
+	for (std::size_t i = 0; i < limits::max_dock_controls; ++i)
+		controls += (i ? "," : "") + std::string(R"({"type":"separator"})");
+	CHECK_OK(f.reg.register_owner("d", with_dock("[" + controls + "]")));
+	CHECK_FAIL(f.reg.register_owner("d", with_dock("[" + controls + R"(,{"type":"separator"}])")),
+		   "too many dock controls (max 256)");
+	CHECK_FAIL(f.reg.register_owner("d", with_dock("{}")), "dock must be an array");
+}
+
+void test_unregister()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("u", R"({"display_name":"U","commands":[{"id":"c"}]})"));
+	bool removed = false;
+	CHECK_OK(f.reg.unregister_owner("u", &removed));
+	CHECK(removed);
+	CHECK(f.reg.owner_count() == 0);
+	CHECK_OK(f.reg.unregister_owner("u", &removed));
+	CHECK(!removed);
+	CHECK_OK(f.reg.unregister_owner("never.registered", &removed));
+	CHECK(!removed);
+	removed = true;
+	CHECK_FAIL(f.reg.unregister_owner("Bad Id", &removed), "invalid owner id");
+	CHECK(!removed);
+	CHECK_FAIL(f.reg.set_state("u", R"({"a":1})", nullptr), "owner not registered");
+	CHECK_FAIL(f.reg.check_emit("u", "evt", "{}"), "owner not registered");
+	CHECK_FAIL(f.reg.check_command("u", "c", "{}"), "owner not registered");
+	CHECK_FAIL(f.reg.heartbeat("u"), "owner not registered");
+}
+
+void test_set_state()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S"})"));
+	std::string changes;
+	CHECK_OK(f.reg.set_state("s", R"({"a":1,"b":"x"})", &changes));
+	CHECK(changes == R"({"a":1,"b":"x"})");
+	CHECK_OK(f.reg.set_state("s", R"({"a":1,"b":"y","c":true})", &changes));
+	CHECK(changes == R"({"b":"y","c":true})");
+	CHECK_OK(f.reg.set_state("s", R"({"a":null})", &changes));
+	CHECK(changes == R"({"a":null})");
+	CHECK_OK(f.reg.set_state("s", R"({"a":null})", &changes));
+	CHECK(changes == "{}");
+
+	CHECK_FAIL(f.reg.set_state("s", R"({"o":{"x":1}})", nullptr), "must be a string, number, boolean or null");
+	CHECK_FAIL(f.reg.set_state("s", R"({"o":[1]})", nullptr), "must be a string, number, boolean or null");
+	CHECK_FAIL(f.reg.set_state("s", "{\"" + repeat('k', 65) + "\":1}", nullptr), "invalid state key");
+	CHECK_FAIL(f.reg.set_state("s", R"({"bad-key":1})", nullptr), "invalid state key");
+	CHECK_FAIL(f.reg.set_state("s", "[]", nullptr), "must be an object");
+
+	Fixture g;
+	CHECK_OK(g.reg.register_owner("s", R"({"display_name":"S"})"));
+	std::string keys;
+	for (std::size_t i = 0; i < limits::max_state_keys; ++i)
+		keys += (i ? "," : "") + std::string("\"k") + std::to_string(i) + "\":0";
+	CHECK_OK(g.reg.set_state("s", "{" + keys + "}", nullptr));
+	// All-or-nothing: the k0 change must not be applied when the call is rejected
+	CHECK_FAIL(g.reg.set_state("s", R"({"k0":1,"extra":1})", nullptr), "too many state keys (max 256)");
+	CHECK_OK(g.reg.set_state("s", R"({"k0":1})", &changes));
+	CHECK(changes == R"({"k0":1})");
+	// Deleting and adding in one call stays within the limit
+	CHECK_OK(g.reg.set_state("s", R"({"k1":null,"extra":1})", nullptr));
+}
+
+void test_check_command()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner(
+		"c",
+		R"({"display_name":"C","commands":[{"id":"add","args":{"seconds":"int","name":"string","rate":"number","on":"bool"}}]})"));
+	CHECK_OK(f.reg.check_command("c", "add", R"({"seconds":5,"name":"x","rate":1.5,"on":true})"));
+	CHECK_OK(f.reg.check_command("c", "add", R"({"seconds":5.0})"));
+	CHECK_OK(f.reg.check_command("c", "add", R"({"rate":2})"));
+	CHECK_OK(f.reg.check_command("c", "add", ""));
+	CHECK_OK(f.reg.check_command("c", "add", "{}"));
+	CHECK_FAIL(f.reg.check_command("c", "nope", "{}"), "unknown command 'nope'");
+	CHECK_FAIL(f.reg.check_command("c", "add", R"({"x":1})"), "unknown argument 'x'");
+	CHECK_FAIL(f.reg.check_command("c", "add", R"({"seconds":1.5})"), "must be int");
+	CHECK_FAIL(f.reg.check_command("c", "add", R"({"name":1})"), "must be string");
+	CHECK_FAIL(f.reg.check_command("c", "add", R"({"on":1})"), "must be bool");
+	CHECK_FAIL(f.reg.check_command("c", "add", "[]"), "must be an object");
+	CHECK_FAIL(f.reg.check_command("c", "Bad", "{}"), "invalid command id");
+}
+
+void test_check_emit()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("e", R"({"display_name":"E"})"));
+	CHECK_OK(f.reg.check_emit("e", "score.changed", R"({"home":1})"));
+	CHECK_OK(f.reg.check_emit("e", "ping", ""));
+	CHECK_FAIL(f.reg.check_emit("e", "bad event", "{}"), "invalid event name");
+	CHECK_FAIL(f.reg.check_emit("e", "", "{}"), "invalid event name");
+	CHECK_FAIL(f.reg.check_emit("e", "big", "{\"p\":\"" + repeat('a', limits::max_json_bytes) + "\"}"),
+		   "json exceeds");
+	CHECK_FAIL(f.reg.check_emit("e", "x", "5"), "must be an object");
+}
+
+void test_heartbeat_and_stale()
+{
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("h", R"({"display_name":"H","commands":[{"id":"c"}]})"));
+	f.advance(1h);
+	CHECK(!f.reg.is_stale("h")); // never sent a heartbeat
+
+	CHECK_OK(f.reg.heartbeat("h"));
+	f.advance(29s);
+	CHECK(!f.reg.is_stale("h"));
+	CHECK_OK(f.reg.check_command("h", "c", ""));
+	f.advance(2s);
+	CHECK(f.reg.is_stale("h"));
+	CHECK_FAIL(f.reg.check_command("h", "c", ""), "owner is stale");
+	CHECK_FAIL(f.reg.heartbeat("h"), "owner is stale; register again");
+	CHECK_OK(f.reg.set_state("h", R"({"a":1})", nullptr));
+	CHECK_OK(f.reg.check_emit("h", "evt", ""));
+
+	CHECK_OK(f.reg.register_owner("h", R"({"display_name":"H","commands":[{"id":"c"}]})"));
+	CHECK(!f.reg.is_stale("h"));
+	CHECK_OK(f.reg.check_command("h", "c", ""));
+	CHECK(!f.reg.is_stale("unknown"));
+}
+
+void test_robustness()
+{
+	Fixture f;
+	CHECK_FAIL(f.reg.register_owner("", "{}"), "missing owner");
+	CHECK_FAIL(f.reg.register_owner("a", ""), "missing json");
+	CHECK_FAIL(f.reg.set_state("", "{}", nullptr), "missing owner");
+	CHECK_FAIL(f.reg.unregister_owner(""), "missing owner");
+	CHECK_FAIL(f.reg.heartbeat(""), "missing owner");
+	CHECK_FAIL(f.reg.check_emit("", "e", ""), "missing owner");
+	CHECK_FAIL(f.reg.check_command("", "c", ""), "missing owner");
+
+	std::string deep = R"({"display_name":"x","deep":)" + repeat('[', 10000) + repeat(']', 10000) + "}";
+	CHECK(deep.size() <= limits::max_json_bytes);
+	CHECK_OK(f.reg.register_owner("deep", deep));
+	std::string deep_state = R"({"v":)" + repeat('[', 10000) + repeat(']', 10000) + "}";
+	CHECK_FAIL(f.reg.set_state("deep", deep_state, nullptr), "must be a string, number, boolean or null");
+
+	std::string garbage;
+	for (int i = 0; i < 4096; ++i)
+		garbage += static_cast<char>((i * 131 + 7) % 256);
+	CHECK_FAIL(f.reg.register_owner("g", garbage), "invalid JSON");
+	CHECK_FAIL(f.reg.set_state("deep", garbage, nullptr), "invalid JSON");
+	CHECK_FAIL(f.reg.check_command("deep", "c", garbage), "invalid JSON");
+	CHECK_FAIL(f.reg.register_owner(garbage, "{}"), "invalid owner id");
+}
+
+void test_threads()
+{
+	Fixture f;
+	std::vector<std::thread> threads;
+	for (int t = 0; t < 8; ++t) {
+		threads.emplace_back([&f, t] {
+			for (int i = 0; i < 1000; ++i) {
+				std::string owner = "t" + std::to_string(t) + "." + std::to_string(i % 4);
+				f.reg.register_owner(owner, R"({"display_name":"T","commands":[{"id":"c"}]})");
+				f.reg.set_state(owner, R"({"i":)" + std::to_string(i) + "}", nullptr);
+				f.reg.check_command(owner, "c", "");
+				f.reg.check_emit(owner, "e", "");
+				f.reg.heartbeat(owner);
+				if (i % 3 == 0)
+					f.reg.unregister_owner(owner);
+			}
+			for (int k = 0; k < 4; ++k)
+				f.reg.unregister_owner("t" + std::to_string(t) + "." + std::to_string(k));
+		});
+	}
+	for (auto &th : threads)
+		th.join();
+	CHECK(f.reg.owner_count() == 0);
+}
+
+} // namespace
+
+int main()
+{
+	test_id_validation();
+	test_register();
+	test_json_size_and_parsing();
+	test_command_limits();
+	test_owner_limit();
+	test_reregister();
+	test_dock();
+	test_unregister();
+	test_set_state();
+	test_check_command();
+	test_check_emit();
+	test_heartbeat_and_stale();
+	test_robustness();
+	test_threads();
+
+	std::printf("registry-tests: %d checks, %d failed\n", checks, failures);
+	return failures == 0 ? 0 : 1;
+}
