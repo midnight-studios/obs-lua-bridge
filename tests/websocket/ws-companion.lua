@@ -16,7 +16,8 @@ local REGISTRATION = '{"display_name":"WS Test Companion","commands":['
 	.. '{"id":"del","args":{"key":"string"}},'
 	.. '{"id":"emit","args":{"event":"string"}},'
 	.. '{"id":"echo","args":{"i":"int","n":"number","s":"string","b":"bool"}},'
-	.. '{"id":"tick"}]}'
+	.. '{"id":"tick"}],'
+	.. '"dock":[{"type":"label","bind":"about"}]}'
 
 local connected = false
 local ticks = 0
@@ -106,6 +107,7 @@ function script_load(settings)
 	ok, err = call("luabridge_register", { owner = OWNER, json = REGISTRATION })
 	if ok then
 		log(obs.LOG_INFO, "registered as '" .. OWNER .. "'")
+		set_state('{"about":"Used by the websocket test suite"}')
 	else
 		log(obs.LOG_WARNING, "registration failed: " .. tostring(err))
 	end
