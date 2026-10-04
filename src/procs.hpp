@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <string>
 
 #include "emitter.hpp"
+#include "event-sink.hpp"
 #include "registry.hpp"
 
 namespace luabridge {
@@ -34,8 +35,12 @@ Registry &registry();
 // JSON returned by luabridge_get_info and sent with luabridge_ready
 std::string info_json();
 
-// Registers all procedures. Signals they cause are sent through emitter.
-void register_procs(Emitter &emitter);
+// Registers all procedures. Signals to scripts go through emitter; events for
+// external clients (obs-websocket) go through events.
+void register_procs(Emitter &emitter, EventSink &events);
+
+// Sets capabilities.websocket in info_json (true once the vendor is registered)
+void set_websocket_available(bool available);
 
 // After disable_procs() (obs_module_unload) every procedure returns at once with
 // ok=false, error="plugin unloaded", without logging or touching the registry.

@@ -374,6 +374,18 @@ void test_check_emit()
 	CHECK_FAIL(f.reg.check_emit("e", "big", "{\"p\":\"" + repeat('a', limits::max_json_bytes) + "\"}"),
 		   "json exceeds");
 	CHECK_FAIL(f.reg.check_emit("e", "x", "5"), "must be an object");
+
+	// obs_data can't carry null or arrays of non-objects, so they are rejected
+	const char *obs_data_error = "json cannot contain null or arrays of non-objects";
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"a":null})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"a":{"b":{"c":null}}})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"tags":["a","b"]})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"n":[1,2]})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"m":[{"ok":1},[{"x":1}]]})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"m":[{"inner":[true]}]})"), obs_data_error);
+	CHECK_OK(f.reg.check_emit("e", "x", R"({"items":[{"id":1},{"id":2,"sub":{"s":"x"}}],"empty":[],"o":{}})"));
+	std::string deep = R"({"d":)" + repeat('[', 10000) + repeat(']', 10000) + "}";
+	CHECK_FAIL(f.reg.check_emit("e", "x", deep), obs_data_error);
 }
 
 void test_heartbeat_and_stale()
@@ -426,6 +438,52 @@ void test_robustness()
 	CHECK_FAIL(f.reg.register_owner(garbage, "{}"), "invalid owner id");
 }
 
+void test_snapshots()
+{
+	Fixture f;
+	CHECK(f.reg.list_owners().empty());
+	CHECK_OK(f.reg.register_owner("zeta", R"({"display_name":"Zeta"})"));
+	CHECK_OK(f.reg.register_owner(
+		"alpha",
+		R"({"display_name":"Alpha","commands":[{"id":"start","label":"Go","description":"d","confirm":true},)"
+		R"({"id":"add","args":{"seconds":"int","name":"string"}}]})"));
+
+	auto owners = f.reg.list_owners();
+	CHECK(owners.size() == 2);
+	CHECK(owners.size() == 2 && owners[0].id == "alpha" && owners[0].display_name == "Alpha" && !owners[0].stale);
+	CHECK(owners.size() == 2 && owners[1].id == "zeta" && owners[1].display_name == "Zeta");
+
+	CHECK_OK(f.reg.heartbeat("zeta"));
+	f.advance(31s);
+	owners = f.reg.list_owners();
+	CHECK(owners.size() == 2 && !owners[0].stale && owners[1].stale);
+
+	nlohmann::json commands;
+	CHECK_OK(f.reg.get_commands("alpha", commands));
+	CHECK(commands.dump() ==
+	      R"([{"args":{},"confirm":true,"description":"d","id":"start","label":"Go"},)"
+	      R"({"args":{"name":"string","seconds":"int"},"confirm":false,"description":"","id":"add","label":"add"}])");
+	CHECK_OK(f.reg.get_commands("zeta", commands));
+	CHECK(commands.dump() == "[]");
+	CHECK_FAIL(f.reg.get_commands("nobody", commands), "owner not registered");
+	CHECK_FAIL(f.reg.get_commands("Bad", commands), "invalid owner id");
+
+	nlohmann::json state;
+	CHECK_OK(f.reg.get_state("alpha", state));
+	CHECK(state.dump() == "{}");
+	CHECK_OK(f.reg.set_state("alpha", R"({"a":1,"b":"x","c":true})", nullptr));
+	CHECK_OK(f.reg.set_state("alpha", R"({"b":null})", nullptr));
+	CHECK_OK(f.reg.get_state("alpha", state));
+	CHECK(state.dump() == R"({"a":1,"c":true})");
+	// The snapshot is independent of later changes
+	CHECK_OK(f.reg.set_state("alpha", R"({"a":2})", nullptr));
+	CHECK(state.dump() == R"({"a":1,"c":true})");
+	CHECK_FAIL(f.reg.get_state("nobody", state), "owner not registered");
+
+	f.reg.clear();
+	CHECK(f.reg.list_owners().empty());
+}
+
 void test_threads()
 {
 	Fixture f;
@@ -439,6 +497,10 @@ void test_threads()
 				f.reg.check_command(owner, "c", "");
 				f.reg.check_emit(owner, "e", "");
 				f.reg.heartbeat(owner);
+				nlohmann::json snapshot;
+				f.reg.get_commands(owner, snapshot);
+				f.reg.get_state(owner, snapshot);
+				f.reg.list_owners();
 				if (i % 3 == 0)
 					f.reg.unregister_owner(owner);
 			}
@@ -468,6 +530,7 @@ int main()
 	test_check_emit();
 	test_heartbeat_and_stale();
 	test_robustness();
+	test_snapshots();
 	test_threads();
 
 	std::printf("registry-tests: %d checks, %d failed\n", checks, failures);

@@ -509,6 +509,31 @@ bool build_owner(std::string_view owner_id, const json &j, Owner &owner, Result 
 	return true;
 }
 
+// True if j survives conversion to obs_data unchanged: obs_data (and so
+// obs-websocket) silently drops null values and array elements that are not
+// objects. Iterative, so deeply nested input cannot overflow the stack.
+bool fits_obs_data(const json &j)
+{
+	std::vector<const json *> pending{&j};
+	while (!pending.empty()) {
+		const json *v = pending.back();
+		pending.pop_back();
+		if (v->is_null())
+			return false;
+		if (v->is_array()) {
+			for (const auto &item : *v) {
+				if (!item.is_object())
+					return false;
+				pending.push_back(&item);
+			}
+		} else if (v->is_object()) {
+			for (const auto &item : *v)
+				pending.push_back(&item);
+		}
+	}
+	return true;
+}
+
 // Runs fn and converts any unexpected exception into an error result
 template<typename Fn> Result guarded(Fn &&fn)
 {
@@ -676,6 +701,8 @@ Result Registry::check_emit(std::string_view owner_id, std::string_view event, s
 		std::string error;
 		if (!parse_object(text, true, j, error))
 			return Result::failure(error);
+		if (!fits_obs_data(j))
+			return Result::failure("json cannot contain null or arrays of non-objects");
 
 		std::lock_guard lock(mutex_);
 		if (owners_.find(owner_id) == owners_.end())
@@ -738,6 +765,62 @@ Result Registry::heartbeat(std::string_view owner_id)
 		if (is_stale_locked(owner->second))
 			return Result::failure("owner is stale; register again");
 		owner->second.last_heartbeat = now_();
+		return r;
+	});
+}
+
+std::vector<OwnerSummary> Registry::list_owners() const
+{
+	std::lock_guard lock(mutex_);
+	std::vector<OwnerSummary> out;
+	out.reserve(owners_.size());
+	for (const auto &[id, owner] : owners_)
+		out.push_back({id, owner.display_name, is_stale_locked(owner)});
+	return out;
+}
+
+Result Registry::get_commands(std::string_view owner_id, json &out) const
+{
+	return guarded([&] {
+		Result r = check_owner_arg(owner_id);
+		if (!r.ok)
+			return r;
+
+		std::lock_guard lock(mutex_);
+		auto owner = owners_.find(owner_id);
+		if (owner == owners_.end())
+			return Result::failure("owner not registered");
+
+		out = json::array();
+		for (const auto &cmd : owner->second.commands) {
+			json args = json::object();
+			for (const auto &[name, type] : cmd.args)
+				args[name] = arg_type_name(type);
+			out.push_back({{"id", cmd.id},
+				       {"label", cmd.label},
+				       {"description", cmd.description},
+				       {"confirm", cmd.confirm},
+				       {"args", std::move(args)}});
+		}
+		return r;
+	});
+}
+
+Result Registry::get_state(std::string_view owner_id, json &out) const
+{
+	return guarded([&] {
+		Result r = check_owner_arg(owner_id);
+		if (!r.ok)
+			return r;
+
+		std::lock_guard lock(mutex_);
+		auto owner = owners_.find(owner_id);
+		if (owner == owners_.end())
+			return Result::failure("owner not registered");
+
+		out = json::object();
+		for (const auto &[key, value] : owner->second.state)
+			out[key] = value;
 		return r;
 	});
 }
