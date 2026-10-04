@@ -68,6 +68,26 @@ target_sources(
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
 
+option(ENABLE_FUZZING "Build the libFuzzer + AddressSanitizer target for the core library (MSVC)" OFF)
+if(ENABLE_FUZZING)
+  # Core sources compiled again with sanitizers, so the whole core is instrumented
+  add_executable(
+    registry-fuzz
+    tests/fuzz/registry-fuzz.cpp
+    src/registry.cpp
+    src/event-data.cpp
+    src/state-events.cpp
+    src/dock-logic.cpp
+    src/rate-limit.cpp
+    src/log-limiter.cpp
+  )
+  target_include_directories(registry-fuzz PRIVATE src)
+  target_link_libraries(registry-fuzz PRIVATE nlohmann_json::nlohmann_json)
+  # /GL (whole-program optimization, on by default in this template) doesn't mix with the sanitizers
+  target_compile_options(registry-fuzz PRIVATE /fsanitize=address /fsanitize=fuzzer /GL- /Zi)
+  target_link_options(registry-fuzz PRIVATE /LTCG:OFF /INCREMENTAL:NO)
+endif()
+
 if(ENABLE_TESTS)
   enable_testing()
   add_executable(registry-tests tests/registry-tests.cpp)
