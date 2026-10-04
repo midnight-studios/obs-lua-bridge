@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -63,6 +64,7 @@ double number_field(const json &obj, const char *key, double fallback)
 }
 
 constexpr double default_number_range = 1000000.0;
+constexpr double large_label_scale = 1.6;
 
 } // namespace
 
@@ -160,10 +162,8 @@ QWidget *OwnerSection::build_control(const json &control)
 		label->setWordWrap(true);
 		label->setTextInteractionFlags(Qt::TextSelectableByMouse);
 		if (string_field(control, "style") == "large") {
-			QFont font = label->font();
-			font.setPointSizeF(font.pointSizeF() * 1.6);
-			font.setBold(true);
-			label->setFont(font);
+			large_labels_.push_back(label);
+			apply_large_style(label);
 		}
 		std::string key = string_field(control, "bind");
 		label->setText(qstr(dock_logic::format_state_value(nullptr)));
@@ -315,6 +315,33 @@ void OwnerSection::apply_changes(const json &changes)
 		else
 			state_[key] = value;
 		refresh_bound(key);
+	}
+}
+
+// OBS themes set font-size on every QWidget in their stylesheet, which overrides
+// setFont(). A widget's own stylesheet wins over the theme's, so the large size
+// goes there, relative to the size the theme gives the label.
+void OwnerSection::apply_large_style(QLabel *label)
+{
+	label->setStyleSheet(QString());
+	label->ensurePolished();
+	QFont font = label->font();
+	double points = font.pointSizeF();
+	if (points <= 0 && font.pixelSize() > 0)
+		points = font.pixelSize() * 72.0 / label->logicalDpiY();
+	if (points <= 0)
+		points = 9.0;
+	label->setStyleSheet(
+		QStringLiteral("font-size: %1pt; font-weight: bold;").arg(points * large_label_scale, 0, 'f', 1));
+}
+
+void OwnerSection::changeEvent(QEvent *event)
+{
+	QFrame::changeEvent(event);
+	// Theme switched: recompute the large size from the new theme's base size
+	if (event->type() == QEvent::StyleChange) {
+		for (QLabel *label : large_labels_)
+			apply_large_style(label);
 	}
 }
 

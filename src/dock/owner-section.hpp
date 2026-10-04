@@ -24,6 +24,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <functional>
 #include <map>
 #include <string>
+#include <vector>
 
 #include <QFrame>
 
@@ -60,7 +61,11 @@ public:
 	// changes: the registry's change set (deleted keys are null)
 	void apply_changes(const nlohmann::json &changes);
 
+protected:
+	void changeEvent(QEvent *event) override;
+
 private:
+	void apply_large_style(QLabel *label);
 	QWidget *build_control(const nlohmann::json &control);
 	QWidget *with_label(const nlohmann::json &control, QWidget *input);
 	void run_button(const nlohmann::json &button);
@@ -87,6 +92,7 @@ private:
 	std::multimap<std::string, QLabel *> labels_;     // state key -> bound labels
 	std::multimap<std::string, QCheckBox *> toggles_; // state key -> bound toggles
 	std::map<std::string, QWidget *> inputs_;         // number/text control id -> widget
+	std::vector<QLabel *> large_labels_;              // style "large"; resized on theme change
 };
 
 } // namespace luabridge::dock

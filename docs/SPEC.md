@@ -336,6 +336,7 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - **Done when:** The stopwatch example (M4) is fully controllable from the dock, and the dock survives script reload, owner removal, and an OBS restart.
 
 ### M4 — Lua helper and reference integrations (2 days)
+- **First:** button `label_bind`. A `button` control may name a state key; while that key is set, the button shows its value, and when it's unset (`null`) it shows the command's label again. The Stopwatch's Start/Pause button needs it. Add unit tests, an API.md entry, and a dock-test demo ("Starting…" → "Started ✓").
 - `luabridge.lua` (B10), with a JSON encoder/decoder and a test harness.
 - **Example 1:** Stopwatch 5.10 integration. Start, Pause, Reset, Add/Subtract and a live display in the dock; websocket commands that don't depend on the script's filename.
 - **Example 2:** a minimal Score Board demo (state → dock and websocket events).
