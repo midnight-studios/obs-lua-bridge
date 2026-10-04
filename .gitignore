@@ -16,6 +16,14 @@
 !LICENSE
 !README.md
 
+# Except for project files
+!.vscode
+!docs
+!lua
+!tests
+!tools
+!CLAUDE.md
+
 # Exclude lock files
 *.lock.json
 

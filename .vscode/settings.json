@@ -1,0 +1,10 @@
+{
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnOpen": false,
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "C_Cpp.clang_format_style": "file",
+  "C_Cpp.clang_format_path": "clang-format",
+  "editor.formatOnSave": true,
+  "[lua]": { "editor.formatOnSave": false },
+  "files.trimTrailingWhitespace": true
+}

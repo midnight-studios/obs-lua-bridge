@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug plugin in test OBS",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "C:/obs-test/bin/64bit/obs64.exe",
+      "cwd": "C:/obs-test/bin/64bit",
+      "args": [],
+      "preLaunchTask": "Deploy to test OBS",
+      "console": "externalTerminal"
+    },
+    {
+      "name": "Attach to running OBS",
+      "type": "cppvsdbg",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ]
+}
