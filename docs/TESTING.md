@@ -31,6 +31,11 @@ window. `CloseMainWindow()` then closes only the Script Log, and OBS looks as if
 it refused to close. `tools/obs-windows.ps1` lists the visible windows of a
 running OBS, to see what is open.
 
+Stop your own websocket clients (watchers, test scripts) before closing the
+test OBS. A client that keeps reconnecting while OBS shuts down holds up
+obs-websocket's unload; the OBS window is gone but the process lingers until
+the client stops.
+
 ## Suites
 
 | Suite | Command | Needs | Time |

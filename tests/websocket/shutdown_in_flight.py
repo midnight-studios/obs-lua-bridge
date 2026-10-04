@@ -15,6 +15,7 @@ Run:  py tests/websocket/shutdown_in_flight.py [--cycles 10]
 import argparse
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import threading
@@ -39,22 +40,35 @@ def obs_running():
 def wait_for_owners(timeout=60):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        client = None
         try:
             client = obsws.ReqClient(**connect_kwargs())
             owners = {o["owner"] for o in call(client, "ListOwners").get("owners", [])}
             if {f"stress.{i}" for i in range(10)} <= owners:
                 return client
-            client.disconnect()
         except Exception:
-            pass
+            pass  # OBS still starting (no server or no vendor yet)
+        # Never leave a connection open: an unread one holds up OBS's exit
+        if client is not None:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
         time.sleep(0.5)
     return None
 
 
 def traffic(stop, counter):
-    """Sends commands until stopped or the connection drops (expected at exit)."""
+    """Sends commands until stopped or the connection drops (expected at exit).
+
+    Behaves like a well-behaved real client: once OBS stops answering (a request
+    times out after 2 s) or closes the connection, it disconnects. A client that
+    keeps its socket open without reading it holds up obs-websocket's unload,
+    which would measure the test client instead of Lua Bridge.
+    """
+    client = None
     try:
-        client = obsws.ReqClient(**connect_kwargs())
+        client = obsws.ReqClient(**{**connect_kwargs(), "timeout": 2})
         n = 0
         while not stop.is_set():
             owner = f"stress.{n % 10}"
@@ -65,7 +79,38 @@ def traffic(stop, counter):
             counter[0] += 1
             time.sleep(0.004)  # ~150-250 requests/s across threads: near the global limit
     except Exception:
-        pass  # connection closed by the exiting OBS
+        pass  # OBS stopped answering or closed the connection while exiting
+    finally:
+        if client is not None:
+            try:
+                client.disconnect()
+            except Exception:
+                pass
+
+
+def seconds(line):
+    """Seconds since midnight of a log line's hh:mm:ss.mmm timestamp, or None."""
+    match = re.match(r"(\d\d):(\d\d):(\d\d\.\d+)", line)
+    return int(match[1]) * 3600 + int(match[2]) * 60 + float(match[3]) if match else None
+
+
+def timeline(log_path):
+    """How long obs-websocket's unload and the whole shutdown (to our unload) took."""
+    marks = {}
+    patterns = {
+        "shutdown": "==== Shutting down",
+        "ws_start": "[obs_module_unload] Shutting down",
+        "ws_end": "[obs_module_unload] Finished",
+        "unloaded": "[lua-bridge] plugin unloaded",
+    }
+    for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        for key, pattern in patterns.items():
+            if pattern in line and seconds(line) is not None:
+                marks[key] = seconds(line)
+    if marks.keys() != patterns.keys():
+        return "timeline incomplete"
+    return (f"shutdown -> plugin unloaded {marks['unloaded'] - marks['shutdown']:.1f} s, "
+            f"of which obs-websocket unload {marks['ws_end'] - marks['ws_start']:.1f} s")
 
 
 def check_log(log_path):
@@ -125,8 +170,8 @@ def main():
         if closed.returncode == 0:
             problems += check_log(log_path)
         status = "PASS" if not problems else "FAIL"
-        print(f"cycle {cycle}: {status} ({counter[0]} requests in flight window, closed in {exit_s:.1f} s, "
-              f"log {log_path.name})", flush=True)
+        print(f"cycle {cycle}: {status} ({counter[0]} requests in flight window, closed in {exit_s:.1f} s; "
+              f"{timeline(log_path)}; log {log_path.name})", flush=True)
         for p in problems[:8]:
             print("   ", p)
         if problems:

@@ -27,12 +27,16 @@ import time
 
 import obsws_python as obsws
 import psutil
+from obsws_python.error import OBSSDKRequestError
 
 from test_vendor import call, connect_error, connect_kwargs
 
 OBS_EXE = os.environ.get("OBS_EXE", r"C:\obs-test\bin\64bit\obs64.exe")
 LOG_DIR = pathlib.Path(os.environ.get("OBS_LOG_DIR", "C:/obs-test/config/obs-studio/logs"))
 BAD = ("already registered and active", "could not send", "unexpected exception", "request failed")
+# Owners that exist only briefly by design: helper-harness.lua registers
+# helper.harness for its tests and removes it about 2 s after loading
+TRANSIENT = frozenset({"helper.harness"})
 
 
 def private_mb():
@@ -44,7 +48,7 @@ def private_mb():
 
 
 def owners(client):
-    return frozenset(o["owner"] for o in call(client, "ListOwners").get("owners", []))
+    return frozenset(o["owner"] for o in call(client, "ListOwners").get("owners", [])) - TRANSIENT
 
 
 def settled_owners(client, timeout=15):
@@ -129,18 +133,25 @@ def main():
     print("Studio Mode toggled on and off")
 
     # Collection switches again, with traffic to the stress owners
-    stop, sent = threading.Event(), [0]
+    stop, sent, accepted, not_ready = threading.Event(), [0], [0], [0]
 
     def traffic():
         c = obsws.ReqClient(**connect_kwargs())
         n = 0
-        while not stop.is_set():
-            # owner not registered is expected while a collection is switching
-            call(c, "RunCommand", {"owner": f"stress.{n % 10}", "command": "hit", "data": {"n": n}})
-            n += 1
-            sent[0] += 1
-            time.sleep(0.05)
-        c.disconnect()
+        try:
+            while not stop.is_set():
+                # Expected while a collection is switching: "owner not registered"
+                # (ok:false), or obs-websocket's "OBS is not ready" (code 207)
+                try:
+                    r = call(c, "RunCommand", {"owner": f"stress.{n % 10}", "command": "hit", "data": {"n": n}})
+                    accepted[0] += bool(r.get("accepted"))
+                except OBSSDKRequestError:
+                    not_ready[0] += 1
+                n += 1
+                sent[0] += 1
+                time.sleep(0.05)
+        finally:
+            c.disconnect()  # an open, unread connection would hold up OBS's exit
 
     t = threading.Thread(target=traffic)
     t.start()
@@ -149,7 +160,10 @@ def main():
     stop.set()
     t.join()
     switch_collection(args.collections[0], "final")
-    print(f"10 switches under load done ({sent[0]} commands sent), {len(problems)} problems")
+    if accepted[0] == 0:
+        problems.append("no command was accepted during the switches under load")
+    print(f"10 switches under load done ({sent[0]} commands sent, {accepted[0]} accepted, "
+          f"{not_ready[0]} 'OBS not ready'), {len(problems)} problems")
 
     with open(log_path, "rb") as f:
         f.seek(log_offset)
