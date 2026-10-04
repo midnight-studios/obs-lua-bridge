@@ -351,11 +351,11 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - ☑ Reduce the `[lua-bridge] registered owner '…'` / `unregistered owner '…'` log lines (`src/procs.cpp`) from info to debug level. They're useful during development, but users with many scripts would see them on every start and exit.
 
 ### M6 — Packaging and CI (1–2 days)
-- The release package ships `luabridge.lua` and the examples in a layout that matches the documented "copy `luabridge.lua` next to your script" instruction (e.g. `lua/luabridge.lua` plus `lua/examples/…` that load `../luabridge.lua`, or each example folder with its own copy).
-- The template workflows build Windows, macOS, and Ubuntu on every push and PR. Fix any platform build errors Claude Code can't reproduce locally by reading the CI logs (`gh run view --log-failed`).
-- Pushing a semantic-version tag (for example `1.0.0`) creates a **draft GitHub release** with the platform artifacts attached.
-- Windows: the template packages a ZIP. Write install instructions (copy into `C:\ProgramData\obs-studio\plugins\`), or add an installer later.
-- macOS: see F2 for signing.
+- ☑ The release package ships `luabridge.lua` and the examples in a layout that matches the documented "copy `luabridge.lua` next to your script" instruction (e.g. `lua/luabridge.lua` plus `lua/examples/…` that load `../luabridge.lua`, or each example folder with its own copy). *Done: `<plugin data>/lua/` on every platform, plus a Lua-only zip per release.*
+- ☑ The template workflows build Windows, macOS, and Ubuntu on every push and PR. Fix any platform build errors Claude Code can't reproduce locally by reading the CI logs (`gh run view --log-failed`). *Also: C++ unit tests on all three, Lua unit tests on Windows and Ubuntu (`.github/workflows/tests.yaml`).*
+- ☑ Pushing a semantic-version tag (for example `1.0.0`) creates a **draft GitHub release** with the platform artifacts attached. *The tag must match `buildspec.json`; see `docs/RELEASING.md`.*
+- ☑ Windows: the template packages a ZIP. Write install instructions (copy into `C:\ProgramData\obs-studio\plugins\`), or add an installer later. *ZIP with `INSTALL.txt`; `docs/INSTALL.md` covers all platforms.*
+- ☑ macOS: see F2 for signing. *Decided: (b), unsigned community build for the beta.*
 
 ### M7 — Documentation and release (1–2 days)
 - `docs/API.md` (the full contract from Part B), `docs/GETTING-STARTED.md` (a five-minute "add a dock to your script" guide), and `CHANGELOG.md`.
@@ -397,7 +397,7 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - ☐ Minimum OBS version is stated and tested (31.x) on the current OBS release too.
 - ☐ The API is documented and frozen as `api_version = 1`. Future changes are additive only.
 - ☐ Scripts without the plugin behave exactly as before.
-- ☐ GPL-2.0 license, third-party notice for `obs-websocket-api.h`, and a changelog.
+- ☑ GPL-2.0 license, third-party notice for `obs-websocket-api.h`, and a changelog. *`LICENSE`, `THIRD-PARTY-NOTICES.md`, `CHANGELOG.md`; `lua/` is MIT.*
 - ☐ Issue templates on GitHub (bug report asks for the OBS version, OS, and log file).
 
 ### F2. macOS signing decision
@@ -407,9 +407,11 @@ Unsigned macOS plugins can be blocked by Gatekeeper and need manual approval. Th
 
 Option (b) is acceptable for a first release if it's stated clearly.
 
+**Decided (M6):** (b) for the 0.9 beta, with the Gatekeeper steps in `docs/INSTALL.md`; signing to be reconsidered for 1.1.
+
 ### F3. Should have
-- ☐ A second contributor with merge rights, or at least a documented release process in `docs/RELEASING.md`.
-- ☐ Dependabot or a monthly reminder to bump `buildspec.json` when OBS releases a new version.
+- ☑ A second contributor with merge rights, or at least a documented release process in `docs/RELEASING.md`.
+- ☑ Dependabot or a monthly reminder to bump `buildspec.json` when OBS releases a new version. *Dependabot for Actions, plus the weekly `obs-canary.yaml` build against the newest OBS.*
 
 ---
 
