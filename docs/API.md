@@ -91,7 +91,7 @@ Every script connected to `luabridge_command` receives every command, so filter 
   - Any invalid command rejects the whole registration.
 - **`dock`:** optional, at most 256 controls in total, counting row items. The control types are:
   - `label`: needs `bind` (a state key); `style` is optional.
-  - `button`: needs `command` (a declared command); `args_from` is optional and maps declared args to `number`/`text` control IDs.
+  - `button`: needs `command` (a declared command); `args_from` is optional and maps declared args to `number`/`text` control IDs. `label_bind` is optional: a state key whose value the button shows while it's set (see [The dock](#the-dock)).
   - `toggle`: needs `bind` and `command`; it sends `{"value": true|false}`, so the command must declare an arg `value` of type `bool`.
   - `number`: needs a unique `id`; `min`, `max` and `default` are optional, with min ≤ default ≤ max. `label` (text shown next to it) is optional.
   - `text`: needs a unique `id`; `default` is optional, ≤ 256 bytes. `label` is optional.
@@ -99,6 +99,8 @@ Every script connected to `luabridge_command` receives every command, so filter 
   - `separator`.
 
   Unknown control types, and controls with invalid fields, are **skipped with a logged warning**, and the registration still succeeds. That way newer scripts degrade gracefully on older plugins. Unknown fields are ignored.
+
+**Registering an owner that is already active** (registered and not stale) replaces it and logs a warning: `owner '<id>' was already registered and active; its registration was replaced (are two scripts using the same owner?)`. The call still succeeds. A script that reloads doesn't trigger it, because it unregisters first; neither does re-registering a stale owner. It usually means two scripts use the same owner ID.
 
 ## State
 
@@ -152,7 +154,7 @@ The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one coll
 | Control | Shown as | What it does |
 |---|---|---|
 | `label` | Text bound to a state key | Shows the key's value (strings as-is, numbers in shortest form, `true`/`false`, `—` when not set) and updates as soon as the script calls `luabridge_set_state`. `style: "large"` shows it large and bold. |
-| `button` | A button with the command's `label` (tooltip: `description`) | Sends the command with `origin = "dock"`. With `confirm: true` it asks first. `args_from` fills args from `number`/`text` controls. |
+| `button` | A button with the command's `label` (tooltip: `description`) | Sends the command with `origin = "dock"`. With `confirm: true` it asks first. `args_from` fills args from `number`/`text` controls. With `label_bind: "<state key>"`, the button shows that key's value while it's set, and the command's label when it's unset, `null` or empty. Use it for e.g. Start/Pause, or "Starting…" → "Started ✓". |
 | `row` | Its items side by side | Buttons share the width. |
 | `number` | A spin box (whole numbers, or 3 decimals if `min`, `max` or `default` isn't whole) | Holds a value for buttons; sends nothing by itself. |
 | `text` | A text field | Holds a value for buttons; sends nothing by itself. |

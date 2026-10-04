@@ -401,6 +401,9 @@ private:
 					}
 				}
 			}
+			// Optional: the button shows this state key's value while it is set
+			if (c.find("label_bind") != c.end() && !require_state_key(c, "label_bind", where))
+				return false;
 		} else if (type == "toggle") {
 			if (!require_state_key(c, "bind", where))
 				return false;
@@ -622,6 +625,13 @@ Result Registry::register_owner(std::string_view owner_id, std::string_view text
 			std::string key = owner.id;
 			owners_.emplace(std::move(key), std::move(owner));
 		} else {
+			// Replacing an owner that is still in use usually means two scripts share an
+			// owner id (reloads unregister first; stale owners are no longer active)
+			if (!is_stale_locked(it->second))
+				r.warnings.push_back(
+					"owner " + quote_id(owner_id) +
+					" was already registered and active; its registration was replaced "
+					"(are two scripts using the same owner?)");
 			it->second = std::move(owner);
 		}
 		return r;
