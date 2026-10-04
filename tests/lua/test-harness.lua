@@ -86,7 +86,10 @@ local function run_sync_tests()
 	check("get_info returns ok", ok, err)
 	check("get_info reports api_version 1", ok and info:find('"api_version":1', 1, true) ~= nil, info)
 	check("get_info has capabilities.run_command = true", ok and info:find('"run_command":true', 1, true) ~= nil, info)
-	check("get_info reports capabilities.websocket", ok and info:find('"websocket":', 1, true) ~= nil, info)
+	check("get_info reports capabilities.websocket as true or false", ok
+		and (info:find('"websocket":true', 1, true) ~= nil or info:find('"websocket":false', 1, true) ~= nil), info)
+	check("get_info capabilities is an object of flags, not an array", ok
+		and info:find('"capabilities":{', 1, true) ~= nil and info:find('"capabilities":[', 1, true) == nil, info)
 
 	-- Happy path
 	expect_ok("register", "luabridge_register", { owner = OWNER, json = REGISTRATION })

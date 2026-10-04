@@ -42,6 +42,7 @@ All procedures are on the global proc handler and set `out bool ok` and `out str
 
 - `capabilities` is an object of flags. It isn't an array because the same JSON is sent over obs-websocket, which can't carry arrays of strings.
 - `websocket` is `true` only when obs-websocket is available and the `LuaBridge` vendor registered.
+- Check a flag before relying on a feature, and treat a missing flag as `false`, since future versions only add flags. Without a JSON decoder, a string search is enough: `info:find('"websocket":true', 1, true) ~= nil`. The M4 helper library adds a decoder.
 
 ## Signals
 
