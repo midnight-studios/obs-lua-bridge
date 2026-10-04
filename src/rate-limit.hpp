@@ -35,14 +35,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 namespace luabridge {
 
+// At namespace scope, not nested in RateLimiter: GCC and Clang reject a nested
+// struct's default member initializers in a default argument of the enclosing
+// class (the class isn't complete there yet)
+struct RateLimitConfig {
+	double owner_rate = 30.0;  // commands per second, sustained
+	double owner_burst = 60.0; // commands allowed at once
+	double global_rate = 200.0;
+	double global_burst = 400.0;
+};
+
 class RateLimiter {
 public:
-	struct Config {
-		double owner_rate = 30.0;  // commands per second, sustained
-		double owner_burst = 60.0; // commands allowed at once
-		double global_rate = 200.0;
-		double global_burst = 400.0;
-	};
+	using Config = RateLimitConfig;
 
 	struct Decision {
 		bool allowed = true;
