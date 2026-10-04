@@ -22,6 +22,8 @@ add_library(
   src/event-data.cpp
   src/state-events.cpp
   src/dock-logic.cpp
+  src/rate-limit.cpp
+  src/log-limiter.cpp
 )
 target_include_directories(${CMAKE_PROJECT_NAME}-core PUBLIC src)
 target_link_libraries(${CMAKE_PROJECT_NAME}-core PUBLIC nlohmann_json::nlohmann_json)

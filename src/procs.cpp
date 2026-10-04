@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "procs.hpp"
+#include "log-limiter.hpp"
 #include "state-events.hpp"
 
 #include <algorithm>
@@ -43,15 +44,26 @@ std::string_view arg(calldata_t *cd, const char *name)
 	return s ? std::string_view(s) : std::string_view();
 }
 
+LogLimiter &failure_log()
+{
+	static LogLimiter limiter;
+	return limiter;
+}
+
 // Writes ok/error and logs failures and warnings with the calling procedure's name
 void finish(calldata_t *cd, const char *proc, std::string_view owner, const Result &r)
 {
 	for (const auto &w : r.warnings)
 		obs_log(LOG_WARNING, "%s(%.*s): %s", proc, (int)std::min<size_t>(owner.size(), 64), owner.data(),
 			w.c_str());
-	if (!r.ok)
-		obs_log(LOG_WARNING, "%s(%.*s): %s", proc, (int)std::min<size_t>(owner.size(), 64), owner.data(),
-			r.error.c_str());
+	if (!r.ok) {
+		// The same failure repeated by a script in a loop is logged once per 10 s
+		std::string key = std::string(proc) + "|" + std::string(owner) + "|" + r.error;
+		LogLimiter::Verdict v = failure_log().check(key);
+		if (v.log)
+			obs_log(LOG_WARNING, "%s(%.*s): %s%s", proc, (int)std::min<size_t>(owner.size(), 64),
+				owner.data(), r.error.c_str(), LogLimiter::suffix(v).c_str());
+	}
 	calldata_set_bool(cd, "ok", r.ok);
 	calldata_set_string(cd, "error", r.error.c_str());
 }
@@ -73,7 +85,7 @@ void proc_register(void *, calldata_t *cd)
 	auto owner = arg(cd, "owner");
 	Result r = register_and_notify(registry(), owner, arg(cd, "json"), *events);
 	if (r.ok)
-		obs_log(LOG_INFO, "registered owner '%.*s'", (int)owner.size(), owner.data());
+		obs_log(LOG_DEBUG, "registered owner '%.*s'", (int)owner.size(), owner.data());
 	finish(cd, "luabridge_register", owner, r);
 }
 
@@ -84,7 +96,7 @@ void proc_unregister(void *, calldata_t *cd)
 	Result r = unregister_and_notify(registry(), owner, *events, &removed);
 	// Unregistering an unknown owner is a silent no-op
 	if (removed)
-		obs_log(LOG_INFO, "unregistered owner '%.*s'", (int)owner.size(), owner.data());
+		obs_log(LOG_DEBUG, "unregistered owner '%.*s'", (int)owner.size(), owner.data());
 	finish(cd, "luabridge_unregister", owner, r);
 }
 

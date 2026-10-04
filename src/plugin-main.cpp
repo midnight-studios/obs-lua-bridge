@@ -34,6 +34,7 @@ namespace {
 
 constexpr const char *dock_id = "lua-bridge";
 bool dock_added = false;
+luabridge::dock::LuaBridgeDock *dock_widget = nullptr; // owned by OBS once added
 
 // Notifications go to obs-websocket clients and to the dock
 luabridge::EventSink &event_sinks()
@@ -52,6 +53,7 @@ void create_dock()
 		return;
 	}
 	dock_added = true;
+	dock_widget = dock;
 	luabridge::dock::attach_events(dock);
 }
 
@@ -59,11 +61,14 @@ void remove_dock()
 {
 	luabridge::dock::detach_events();
 	if (dock_added) {
+		// An open confirm must not run its command (or outlive its parent) at exit
+		dock_widget->close_dialogs();
 		// OBS saved the dock layout before OBS_FRONTEND_EVENT_EXIT, so its
 		// position is kept; removing it now destroys our widgets while the
 		// plugin is still fully alive
 		obs_frontend_remove_dock(dock_id);
 		dock_added = false;
+		dock_widget = nullptr;
 	}
 }
 

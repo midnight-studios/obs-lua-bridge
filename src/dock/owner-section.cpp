@@ -255,12 +255,36 @@ void OwnerSection::run_button(const json &button)
 	const json &cmd = commands_[command];
 
 	auto confirm = cmd.find("confirm");
-	if (confirm != cmd.end() && confirm->is_boolean() && confirm->get<bool>()) {
-		QString question = text("LuaBridge.Dock.ConfirmText").arg(qstr(string_field(cmd, "label")));
-		if (QMessageBox::question(this, text("LuaBridge.Dock.Title"), question) != QMessageBox::Yes)
-			return;
+	if (confirm == cmd.end() || !confirm->is_boolean() || !confirm->get<bool>()) {
+		send_button(button);
+		return;
 	}
 
+	// Non-modal on purpose: a modal dialog (even window-modal) makes Qt ignore
+	// close requests to the main window, so an open confirm would block OBS
+	// from closing. One confirm per section; clicking again raises it.
+	if (confirm_) {
+		confirm_->raise();
+		confirm_->activateWindow();
+		return;
+	}
+	QString question = text("LuaBridge.Dock.ConfirmText").arg(qstr(string_field(cmd, "label")));
+	auto *box = new QMessageBox(QMessageBox::Question, text("LuaBridge.Dock.Title"), question,
+				    QMessageBox::Yes | QMessageBox::No, this);
+	box->setDefaultButton(QMessageBox::No);
+	box->setWindowModality(Qt::NonModal);
+	box->setAttribute(Qt::WA_DeleteOnClose);
+	connect(box, &QMessageBox::finished, this, [this, button](int result) {
+		if (result == QMessageBox::Yes)
+			send_button(button); // reads the inputs as they are now
+	});
+	confirm_ = box;
+	box->open();
+}
+
+void OwnerSection::send_button(const json &button)
+{
+	std::string command = string_field(button, "command");
 	std::map<std::string, json> values;
 	for (const auto &[id, widget] : inputs_) {
 		if (auto *spin = qobject_cast<QSpinBox *>(widget))
@@ -270,7 +294,13 @@ void OwnerSection::run_button(const json &button)
 		else if (auto *edit = qobject_cast<QLineEdit *>(widget))
 			values[id] = edit->text().toStdString();
 	}
-	send(command, dock_logic::build_button_args(button, cmd, values));
+	send(command, dock_logic::build_button_args(button, commands_[command], values));
+}
+
+void OwnerSection::close_dialogs()
+{
+	if (confirm_)
+		confirm_->reject(); // finished(No): nothing is sent
 }
 
 void OwnerSection::send(const std::string &command, const json &args)

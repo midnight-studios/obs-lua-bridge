@@ -40,6 +40,22 @@ PASSWORD = os.environ.get("OBS_WS_PASSWORD", "")
 RUN_ID = str(time.time_ns())
 
 
+# Default RunCommand rate limit per owner (src/rate-limit.hpp)
+RATE_BURST = 60
+
+
+def paced(fn, count, per_second):
+    """Calls fn count times, at most per_second times per second."""
+    interval = 1.0 / per_second
+    next_at = time.monotonic()
+    for _ in range(count):
+        delay = next_at - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+        fn()
+        next_at += interval
+
+
 def connect_kwargs():
     # Always pass all three, so obsws-python never falls back to ~/config.toml
     return {"host": HOST, "port": PORT, "password": PASSWORD, "timeout": 5}
@@ -291,9 +307,14 @@ class VendorTests(unittest.TestCase):
 
     # 10
     def test_burst_is_lossless(self):
+        # RunCommand is rate limited per owner (30/s, burst 60; see API.md): send
+        # one full burst as fast as possible, then the rest just under the
+        # sustained rate. Every command must be accepted and delivered.
         start = self.state().get("ticks", 0)
-        for _ in range(200):
+        for _ in range(RATE_BURST):
             self.assertEqual(run(self.client, "tick"), {"ok": True, "accepted": True})
+        paced(lambda: self.assertEqual(run(self.client, "tick"), {"ok": True, "accepted": True}), 200 - RATE_BURST,
+              per_second=25)
         self.wait_for_state("ticks", start + 200)
 
     # 11
@@ -305,10 +326,13 @@ class VendorTests(unittest.TestCase):
             try:
                 client = obsws.ReqClient(**connect_kwargs())
                 try:
-                    for _ in range(50):
+                    # 4 clients x 6/s stays under the per-owner limit (30/s)
+                    def one():
                         response = run(client, "tick")
                         if response != {"ok": True, "accepted": True}:
                             failures.append(response)
+
+                    paced(one, 50, per_second=6)
                 finally:
                     client.disconnect()
             except Exception as exc:

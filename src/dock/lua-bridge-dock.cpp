@@ -178,6 +178,12 @@ void LuaBridgeDock::update_placeholder()
 	stack_->setCurrentWidget(sections_.empty() ? stack_->widget(0) : scroll_);
 }
 
+void LuaBridgeDock::close_dialogs()
+{
+	for (const auto &[owner, section] : sections_)
+		section->close_dialogs();
+}
+
 void LuaBridgeDock::apply_state_changes(const std::string &owner, const std::string &changes_json)
 {
 	auto it = sections_.find(owner);

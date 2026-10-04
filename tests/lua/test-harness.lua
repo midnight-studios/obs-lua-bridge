@@ -117,8 +117,10 @@ local function run_sync_tests()
 		{ owner = "nobody", command = "ping", json = "{}" }, "owner not registered")
 	expect_fail("rejects null in event data", "luabridge_emit",
 		{ owner = OWNER, event = "harness.test", json = '{"a":null}' }, "json cannot contain null or arrays of non-objects")
+	-- Another owner, so its warning isn't folded into the previous identical one
+	-- by the plugin's 10 s log deduplication (the data check runs first)
 	expect_fail("rejects arrays of strings in event data", "luabridge_emit",
-		{ owner = OWNER, event = "harness.test", json = '{"tags":["a","b"]}' },
+		{ owner = OWNER .. ".json", event = "harness.test", json = '{"tags":["a","b"]}' },
 		"json cannot contain null or arrays of non-objects")
 	expect_fail("rejects invalid event name", "luabridge_emit",
 		{ owner = OWNER, event = "bad event", json = "{}" }, "invalid event name")
