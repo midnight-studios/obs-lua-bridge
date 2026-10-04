@@ -19,6 +19,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 // Unit tests for the registry (no OBS needed). Run with ctest or directly;
 // exits non-zero if any check fails.
 
+#include "event-data.hpp"
 #include "registry.hpp"
 
 #include <cstdio>
@@ -361,6 +362,53 @@ void test_check_command()
 	CHECK_FAIL(f.reg.check_command("c", "add", R"({"on":1})"), "must be bool");
 	CHECK_FAIL(f.reg.check_command("c", "add", "[]"), "must be an object");
 	CHECK_FAIL(f.reg.check_command("c", "Bad", "{}"), "invalid command id");
+
+	// The arguments to forward: null means omitted and is removed, on every channel
+	std::string args;
+	CHECK_OK(f.reg.check_command("c", "add", R"({"seconds":5,"name":null})", &args));
+	CHECK(args == R"({"seconds":5})");
+	CHECK_OK(f.reg.check_command("c", "add", R"({"seconds":null})", &args));
+	CHECK(args == "{}");
+	CHECK_OK(f.reg.check_command("c", "add", R"({"undeclared":null})", &args));
+	CHECK(args == "{}");
+	CHECK_OK(f.reg.check_command("c", "add", "", &args));
+	CHECK(args == "{}");
+	CHECK_OK(f.reg.check_command("c", "add", "{\"rate\":0.1,\"name\":\"caf\xc3\xa9\",\"on\":false,\"seconds\":-3}",
+				     &args));
+	CHECK(args == "{\"name\":\"caf\xc3\xa9\",\"on\":false,\"rate\":0.1,\"seconds\":-3}");
+	args = "unchanged";
+	CHECK_FAIL(f.reg.check_command("c", "add", R"({"seconds":"x"})", &args), "must be int");
+	CHECK(args == "unchanged");
+}
+
+void test_event_data()
+{
+	using event_data::custom_event;
+	using event_data::state_changed;
+
+	CHECK(state_changed("o", R"({"a":1,"b":"x"})").dump() == R"({"changes":{"a":1,"b":"x"},"owner":"o"})");
+	CHECK(state_changed("o", R"({"a":null})").dump() == R"({"changes":{},"owner":"o","removed":{"a":true}})");
+	CHECK(state_changed("o", R"({"a":2,"b":null,"c":null})").dump() ==
+	      R"({"changes":{"a":2},"owner":"o","removed":{"b":true,"c":true}})");
+	// A registry change set round-trips into the event
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S"})"));
+	std::string changes;
+	CHECK_OK(f.reg.set_state("s", R"({"k":1,"t":"x"})", &changes));
+	CHECK_OK(f.reg.set_state("s", R"({"k":null,"t":"y"})", &changes));
+	CHECK(state_changed("s", changes).dump() == R"({"changes":{"t":"y"},"owner":"s","removed":{"k":true}})");
+
+	bool threw = false;
+	try {
+		state_changed("o", "{broken");
+	} catch (const nlohmann::json::exception &) {
+		threw = true;
+	}
+	CHECK(threw);
+
+	CHECK(custom_event("o", "e.x", R"({"items":[{"id":1}],"s":"v"})").dump() ==
+	      R"({"data":{"items":[{"id":1}],"s":"v"},"event":"e.x","owner":"o"})");
+	CHECK(custom_event("o", "e", "{}").dump() == R"({"data":{},"event":"e","owner":"o"})");
 }
 
 void test_check_emit()
@@ -530,6 +578,7 @@ int main()
 	test_check_emit();
 	test_heartbeat_and_stale();
 	test_robustness();
+	test_event_data();
 	test_snapshots();
 	test_threads();
 

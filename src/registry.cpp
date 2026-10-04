@@ -711,7 +711,8 @@ Result Registry::check_emit(std::string_view owner_id, std::string_view event, s
 	});
 }
 
-Result Registry::check_command(std::string_view owner_id, std::string_view command, std::string_view text)
+Result Registry::check_command(std::string_view owner_id, std::string_view command, std::string_view text,
+			       std::string *args_json)
 {
 	return guarded([&] {
 		Result r = check_owner_arg(owner_id);
@@ -724,6 +725,14 @@ Result Registry::check_command(std::string_view owner_id, std::string_view comma
 		std::string error;
 		if (!parse_object(text, true, j, error))
 			return Result::failure(error);
+		// null means "argument omitted" on every channel (obs-websocket 5.6 drops
+		// null before we see it, 5.7 passes it through), so remove it here
+		for (auto it = j.begin(); it != j.end();) {
+			if (it->is_null())
+				it = j.erase(it);
+			else
+				++it;
+		}
 
 		std::lock_guard lock(mutex_);
 		auto owner = owners_.find(owner_id);
@@ -747,6 +756,8 @@ Result Registry::check_command(std::string_view owner_id, std::string_view comma
 				return Result::failure("argument " + quote_id(it.key()) + " must be " +
 						       arg_type_name(arg->second));
 		}
+		if (args_json)
+			*args_json = dump(j);
 		return r;
 	});
 }

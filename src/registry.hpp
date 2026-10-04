@@ -118,8 +118,11 @@ public:
 	// Checks a luabridge_emit call. Empty json counts as {}. The data may not
 	// contain null or arrays of non-objects, which obs-websocket cannot carry.
 	Result check_emit(std::string_view owner, std::string_view event, std::string_view json);
-	// Checks that a command may be sent to a script. Empty json counts as {}.
-	Result check_command(std::string_view owner, std::string_view command, std::string_view json);
+	// Checks that a command may be sent to a script. Empty json counts as {}, and
+	// null arguments count as omitted. On success *args_json (if given) receives
+	// the arguments to send to the script, with null arguments removed.
+	Result check_command(std::string_view owner, std::string_view command, std::string_view json,
+			     std::string *args_json = nullptr);
 	Result heartbeat(std::string_view owner);
 
 	// Read-only snapshots (copied under the lock) for obs-websocket and the dock

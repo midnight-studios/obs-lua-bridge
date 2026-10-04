@@ -15,7 +15,7 @@ include(helpers)
 find_package(nlohmann_json 3.11 REQUIRED)
 
 # Registry and validation: no libobs dependency, shared by the plugin and the unit tests
-add_library(${CMAKE_PROJECT_NAME}-core STATIC src/registry.cpp)
+add_library(${CMAKE_PROJECT_NAME}-core STATIC src/registry.cpp src/event-data.cpp)
 target_include_directories(${CMAKE_PROJECT_NAME}-core PUBLIC src)
 target_link_libraries(${CMAKE_PROJECT_NAME}-core PUBLIC nlohmann_json::nlohmann_json)
 # Linked into a shared module, so it needs -fPIC on Linux

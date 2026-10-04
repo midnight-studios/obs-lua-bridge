@@ -247,9 +247,14 @@ class VendorTests(unittest.TestCase):
         self.assertIsInstance(received["n"], float)
 
     def test_run_command_null_and_array_args(self):
-        # obs-websocket drops null before the plugin sees it: the arg is simply omitted
+        # null counts as an omitted arg and is removed before the script sees it
+        # (obs-websocket 5.6 drops it itself; 5.7 passes it through to the plugin)
         marker = "null-" + RUN_ID
         self.assert_ok(run(self.client, "echo", {"s": marker, "i": None}))
+        self.assertEqual(self.wait_for_echo(marker), {"s": marker})
+        # A null for an undeclared name is ignored the same way
+        marker = "null-undeclared-" + RUN_ID
+        self.assert_ok(run(self.client, "echo", {"s": marker, "zzz": None}))
         self.assertEqual(self.wait_for_echo(marker), {"s": marker})
         # Arrays never reach a script as args: the key survives and fails validation
         self.assert_error(run(self.client, "echo", {"i": [1, 2]}), "argument 'i' must be int")

@@ -122,9 +122,10 @@ void proc_run_command(void *, calldata_t *cd)
 	auto owner = arg(cd, "owner");
 	auto command = arg(cd, "command");
 	auto json = arg(cd, "json");
-	Result r = registry().check_command(owner, command, json);
+	std::string args;
+	Result r = registry().check_command(owner, command, json, &args);
 	if (r.ok)
-		emitter->command(std::string(owner), std::string(command), json_or_empty_object(json), "script");
+		emitter->command(std::string(owner), std::string(command), args, "script");
 	finish(cd, "luabridge_run_command", owner, r);
 }
 

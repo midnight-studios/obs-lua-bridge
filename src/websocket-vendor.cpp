@@ -26,6 +26,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs.h>
 #include <plugin-support.h>
 
+#include "event-data.hpp"
 #include "procs.hpp"
 #include "third-party/obs-websocket-api.h"
 
@@ -163,9 +164,10 @@ json run_command(obs_data_t *request)
 	    !data_field(request, data, error)) {
 		result = failure(error);
 	} else {
-		Result r = registry().check_command(owner, command, data);
+		std::string args;
+		Result r = registry().check_command(owner, command, data, &args);
 		if (r.ok) {
-			emitter->command(owner, command, data.empty() ? "{}" : data, "websocket");
+			emitter->command(owner, command, args, "websocket");
 			result = {{"ok", true}, {"accepted", true}};
 		} else {
 			result = failure(r.error);
@@ -181,7 +183,11 @@ template<json (*Handler)(obs_data_t *)> void handle(obs_data_t *request, obs_dat
 	json result;
 	try {
 		result = active ? Handler(request) : failure("plugin unloaded");
+	} catch (const std::exception &e) {
+		obs_log(LOG_ERROR, "websocket request failed: %s", e.what());
+		result = failure("internal error");
 	} catch (...) {
+		obs_log(LOG_ERROR, "websocket request failed: unknown exception");
 		result = failure("internal error");
 	}
 	try {
@@ -208,36 +214,25 @@ class WebsocketEvents final : public EventSink {
 public:
 	void state_changed(const std::string &owner, const std::string &changes_json) override
 	{
-		if (!active)
-			return;
-		try {
-			// obs_data drops null, so deleted keys are reported in "removed"
-			json changes = json::object(), removed = json::object();
-			for (auto &[key, value] : json::parse(changes_json).items()) {
-				if (value.is_null())
-					removed[key] = true;
-				else
-					changes[key] = value;
-			}
-			json data = {{"owner", owner}, {"changes", std::move(changes)}};
-			if (!removed.empty())
-				data["removed"] = std::move(removed);
-			emit_event("StateChanged", data);
-		} catch (...) {
-			obs_log(LOG_ERROR, "unexpected exception while sending StateChanged");
-		}
+		send("StateChanged", [&] { return event_data::state_changed(owner, changes_json); });
 	}
 
 	void custom_event(const std::string &owner, const std::string &event, const std::string &json_text) override
 	{
+		send("CustomEvent", [&] { return event_data::custom_event(owner, event, json_text); });
+	}
+
+private:
+	template<typename Build> static void send(const char *name, Build build)
+	{
 		if (!active)
 			return;
 		try {
-			// check_emit has already rejected data obs_data can't carry
-			emit_event("CustomEvent",
-				   {{"owner", owner}, {"event", event}, {"data", json::parse(json_text)}});
+			emit_event(name, build());
+		} catch (const std::exception &e) {
+			obs_log(LOG_ERROR, "could not send %s: %s", name, e.what());
 		} catch (...) {
-			obs_log(LOG_ERROR, "unexpected exception while sending CustomEvent");
+			obs_log(LOG_ERROR, "could not send %s: unknown exception", name);
 		}
 	}
 };

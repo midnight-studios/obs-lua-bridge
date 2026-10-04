@@ -140,7 +140,8 @@ Registering again clears the stale status. Owners that never send a heartbeat ne
 For `emit` and `run_command`, an empty `json` counts as `{}`. `run_command` checks the JSON against the command's declared args:
 - undeclared keys are rejected;
 - `int` must be a whole number;
-- missing args are allowed.
+- missing args are allowed;
+- a `null` value counts as a missing arg. It's removed before the command is delivered, so scripts never receive `null` args. This applies to commands from scripts, the dock and websocket alike.
 
 ## obs-websocket vendor API
 
@@ -161,7 +162,7 @@ Every response is an object with `"ok": true|false`. On failure it also has `"er
 - **Fire and forget:** `RunCommand` is validated exactly like `luabridge_run_command` (owner, command, size, declared args, stale owner). The script receives `luabridge_command` with `origin = "websocket"` asynchronously, after the response has been sent. Scripts report results through state or events.
 - **Field types:** `owner` and `command` must be strings, and `data` (optional) must be an object. Otherwise the error is `missing owner`, `owner must be a string`, `missing command`, `command must be a string` or `data must be an object`.
 - **What reaches the script:** every value valid for a declared arg (int, number, string, bool) arrives unchanged.
-  - obs-websocket removes `null` values before the plugin sees them, so a `null` arg counts as omitted.
+  - A `null` argument counts as omitted and is removed before the script sees it. That makes behaviour the same on every obs-websocket version: 5.6 drops `null` before the plugin sees it, while 5.7 passes it through. A `null` for an undeclared name is ignored too.
   - An array keeps its key but loses its contents, so it then fails validation (`argument '<name>' must be <type>` or `unknown argument '<name>'`).
 - **Threading:** requests are handled on obs-websocket's own threads, possibly several at once. The registry is thread-safe, and signals to scripts are still delivered on the UI thread, in order.
 - **During shutdown:** requests answer `{"ok":false,"error":"plugin unloaded"}`.
