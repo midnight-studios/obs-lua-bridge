@@ -79,6 +79,7 @@ function script_load(settings)
 	ok, err = call("luabridge_register", { owner = OWNER, json = REGISTRATION })
 	if ok then
 		log("registered as '" .. OWNER .. "'")
+		call("luabridge_set_state", { owner = OWNER, json = '{"last_ping":"Last ping: never"}' })
 	else
 		log("registration failed: " .. tostring(err))
 	end

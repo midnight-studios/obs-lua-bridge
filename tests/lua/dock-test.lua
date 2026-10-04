@@ -163,13 +163,15 @@ end
 function script_properties()
 	local props = obs.obs_properties_create()
 	obs.obs_properties_add_button(props, "stop_heartbeat", "Stop heartbeat", function()
-		stop_heartbeat()
-		log("heartbeat stopped; the dock section goes stale in about 30 s")
+		if heartbeat_running then
+			stop_heartbeat()
+			log("heartbeat stopped; the dock section goes stale in about 30 s")
+		end
 		return false
 	end)
 	obs.obs_properties_add_button(props, "resume_heartbeat", "Resume heartbeat", function()
-		-- A stale (or removed) owner must register again
-		if connected and register() then
+		-- A stale (or removed) owner must register again; a running one needs nothing
+		if connected and not heartbeat_running and register() then
 			start_heartbeat()
 			log("heartbeat resumed")
 		end
