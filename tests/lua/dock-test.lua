@@ -145,7 +145,7 @@ end
 function script_load(settings)
 	local available, why = bridge.available()
 	if not available then
-		log("Lua Bridge plugin not available (" .. tostring(why) .. "); nothing to show")
+		log(tostring(why) .. "; nothing to show")
 		return
 	end
 	bridge.register(OWNER, REGISTRATION, { heartbeat_interval = 5, on_heartbeat = on_heartbeat })

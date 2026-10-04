@@ -24,7 +24,7 @@ end
 function script_load(settings)
 	local available, why = bridge.available()
 	if not available then
-		log("Lua Bridge plugin not available (" .. tostring(why) .. "); running without it")
+		log(tostring(why) .. "; running without it")
 		return
 	end
 	log("info: " .. bridge.json.encode(bridge.info()))

@@ -71,7 +71,7 @@ function script_load(settings)
 	if not available then
 		local r, err = bridge.register(OWNER, { display_name = "x" })
 		check("plugin absent: calls fall back cleanly", r == false and err == why, err)
-		log("Lua Bridge plugin not available (" .. tostring(why) .. ")")
+		log(tostring(why))
 		log(string.format("RESULT: %d passed, %d failed", passed, failed))
 		return
 	end
