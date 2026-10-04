@@ -119,12 +119,19 @@ void proc_run_command(void *, calldata_t *cd)
 	finish(cd, "luabridge_run_command", owner, r);
 }
 
-// Procedures are called from C; never let an exception escape
-template<void (*Proc)(void *, calldata_t *)> void safe(void *data, calldata_t *cd)
+enum class WhenUnloaded { Fail, Succeed };
+
+// Procedures are called from C; never let an exception escape. After unload,
+// return at once: unregister succeeds (the registry is already empty, so the
+// owner is gone) so scripts calling it from script_unload log nothing on exit;
+// everything else fails with "plugin unloaded".
+template<void (*Proc)(void *, calldata_t *), WhenUnloaded unloaded = WhenUnloaded::Fail>
+void safe(void *data, calldata_t *cd)
 {
 	if (!procs_enabled) {
-		calldata_set_bool(cd, "ok", false);
-		calldata_set_string(cd, "error", "plugin unloaded");
+		bool ok = unloaded == WhenUnloaded::Succeed;
+		calldata_set_bool(cd, "ok", ok);
+		calldata_set_string(cd, "error", ok ? "" : "plugin unloaded");
 		return;
 	}
 	try {
@@ -174,7 +181,7 @@ void register_procs(Emitter &signal_emitter)
 	proc_handler_add(ph, "void luabridge_register(in string owner, in string json, out bool ok, out string error)",
 			 safe<proc_register>, nullptr);
 	proc_handler_add(ph, "void luabridge_unregister(in string owner, out bool ok, out string error)",
-			 safe<proc_unregister>, nullptr);
+			 safe<proc_unregister, WhenUnloaded::Succeed>, nullptr);
 	proc_handler_add(ph, "void luabridge_set_state(in string owner, in string json, out bool ok, out string error)",
 			 safe<proc_set_state>, nullptr);
 	proc_handler_add(

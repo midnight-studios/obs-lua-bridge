@@ -77,7 +77,10 @@ end
 
 function script_unload()
 	if connected then
-		call("luabridge_unregister", { owner = OWNER })
+		local ok, err = call("luabridge_unregister", { owner = OWNER })
+		if not ok then
+			obs.script_log(obs.LOG_WARNING, "unregister failed: " .. tostring(err))
+		end
 		obs.signal_handler_disconnect(obs.obs_get_signal_handler(), "luabridge_command", on_command)
 		connected = false
 	end
