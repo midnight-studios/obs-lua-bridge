@@ -185,6 +185,28 @@ The JSON passed to `luabridge_emit` is also sent to websocket clients. obs-webso
 
 Registering again clears the stale status. Owners that never send a heartbeat never go stale.
 
+## Logging
+
+Lua Bridge keeps the OBS log quiet in normal use:
+- **Once per start:** `plugin loaded`, whether the obs-websocket vendor registered, and `plugin unloaded`.
+- **Registering and unregistering owners** is logged at debug level, which OBS only writes with `--verbose`.
+- **Failed calls** log a warning: `<procedure>(<owner>): <error>` for scripts, `websocket <request>(<owner>): <error>` for websocket clients. The same failure (same procedure, owner and error) repeated within 10 s is logged once. The next one after that ends with `(N similar lines suppressed in the last 10 s)`. A script that calls something wrong in a loop therefore can't flood the log.
+- **Registration warnings** (a dock control skipped, an owner replaced while active) are logged for every registration.
+- **The helper library** deduplicates its own handler-failure warnings the same way, per handler.
+
+**Script log levels.** OBS opens its Script Log window whenever a script logs at warning level or worse (`script_log` with `LOG_WARNING` or `LOG_ERROR`); the plugin's own lines above don't, because they don't come from a script. So scripts should warn only about problems the user or script author must act on. The helper and the examples follow this:
+
+| Situation | Helper / examples log |
+|---|---|
+| Plugin not installed | nothing (`hello-bridge.lua` logs one info line) |
+| Owner re-registered after the plugin forgot it | info |
+| Plugin too old, or its `luabridge_get_info` fails | one warning: update the Lua Bridge plugin |
+| A script's own command, event or heartbeat handler throws | warning (a bug in that script), deduplicated |
+
+## Duplicated scripts and instance IDs
+
+OBS can't load the same script file twice, so running two copies of a script means two files. Each copy needs its own **owner**: use the base owner plus a suffix, e.g. `stopwatch` and `stopwatch.2`. The examples `stopwatch-demo.lua` and `scoreboard.lua` have an **Instance ID** script property for this. When it's empty they use the base owner; `2` gives `stopwatch.2`. Changing it registers the script under the new owner. Two scripts using the same owner replace each other's registration, which the plugin logs as a warning.
+
 ## Limits and IDs
 
 | Item | Rule |
@@ -255,6 +277,28 @@ Every response is an object with `"ok": true|false`. On failure it also has `"er
 - **Threading:** requests are handled on obs-websocket's own threads, possibly several at once. The registry is thread-safe, and signals to scripts are still delivered on the UI thread, in order.
 - **During shutdown:** requests answer `{"ok":false,"error":"plugin unloaded"}`.
 
+### Rate limiting
+
+`RunCommand` is rate limited, because every accepted command becomes work on OBS's UI thread. obs-websocket doesn't tell the plugin which client sent a request, so the limits are per **target owner**, plus one global limit:
+
+| Limit | Sustained | Burst |
+|---|---|---|
+| Per owner | 30 commands/s | 60 |
+| All owners together | 200 commands/s | 400 |
+
+That's far above what people or controllers like a Stream Deck send.
+
+**When a request is over the limit:**
+- The client gets `{"ok": false, "error": "rate limited; retry in 120 ms", "retry_after_ms": 120}`. `retry_after_ms` appears only on this error, and is the time until one more command for that owner fits.
+- The command is **not** queued or delivered.
+- Other owners are unaffected unless the global limit is reached.
+
+**How it's logged** (without flooding the log):
+- The first rejection logs one warning: `websocket RunCommand(<owner>): rate limited (30/s, burst 60)`.
+- While requests keep being rejected, at most one line per owner every 10 s, ending with `; N more requests were rate limited in the last 10 s`.
+
+Other requests (`GetInfo`, `ListOwners`, `ListCommands`, `GetState`) are read-only and aren't rate limited. Commands from scripts (`luabridge_run_command`) and from the dock aren't rate limited either, because they come from inside OBS.
+
 ### Events
 
 | Event | Data | Sent when |
@@ -293,4 +337,5 @@ These are stable, so scripts may match on them:
 | `unknown command '<id>'` / `unknown argument '<name>'` / `argument '<name>' must be <type>` | `run_command` didn't match the declaration |
 | `json cannot contain null or arrays of non-objects` | `luabridge_emit` data that obs-websocket couldn't carry (see [Event data](#event-data)) |
 | `owner must be a string` / `command must be a string` / `missing command` / `data must be an object` | Websocket request fields of the wrong type |
+| `rate limited; retry in <N> ms` | Websocket `RunCommand` over the rate limit (see [Rate limiting](#rate-limiting)); the response also has `retry_after_ms` |
 | `plugin unloaded` | Called during OBS shutdown, after the plugin unloaded (never returned by `luabridge_unregister`) |

@@ -22,6 +22,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "dock-logic.hpp"
 #include "event-data.hpp"
 #include "fan-out-sink.hpp"
+#include "log-limiter.hpp"
+#include "rate-limit.hpp"
 #include "state-events.hpp"
 #include "registry.hpp"
 
@@ -471,6 +473,109 @@ struct RecordingSink final : EventSink {
 	void owner_unregistered(const std::string &owner) override { calls.push_back("unregistered:" + owner); }
 };
 
+void test_printable()
+{
+	CHECK(printable("stopwatch.2") == "stopwatch.2");
+	CHECK(printable("\xe2\x80\xaeRTL\xe2\x80\xac") == "???RTL???"); // bidi override
+	CHECK(printable("a\nb\tc\x01") == "a?b?c?");
+	CHECK(printable(std::string("x\0y", 3)) == "x?y");
+	CHECK(printable(std::string(70, 'z')) == std::string(64, 'z') + "...");
+	CHECK(printable("") == "");
+}
+
+void test_rate_limiter()
+{
+	auto now = std::make_shared<Clock::time_point>(Clock::time_point{} + 1h);
+	auto clock = [now] {
+		return *now;
+	};
+	RateLimiter::Config config; // 30/s burst 60 per owner, 200/s burst 400 global
+	RateLimiter limiter(config, clock);
+
+	// Burst: 60 at once, then limited
+	int allowed = 0;
+	RateLimiter::Decision last;
+	for (int i = 0; i < 100; ++i) {
+		last = limiter.acquire("a");
+		allowed += last.allowed ? 1 : 0;
+	}
+	CHECK(allowed == 60);
+	CHECK(!last.allowed);
+	CHECK(last.retry_after_ms == 34); // 1 token at 30/s = 33.3 ms, rounded up
+
+	// Refill: 30/s sustained
+	*now += 1s;
+	allowed = 0;
+	for (int i = 0; i < 100; ++i)
+		allowed += limiter.acquire("a").allowed ? 1 : 0;
+	CHECK(allowed == 30);
+	*now += 100ms;
+	CHECK(limiter.acquire("a").allowed); // 3 tokens after 100 ms
+	*now += 10s;                         // refills to the burst, not beyond
+	allowed = 0;
+	for (int i = 0; i < 100; ++i)
+		allowed += limiter.acquire("a").allowed ? 1 : 0;
+	CHECK(allowed == 60);
+
+	// Owners are independent
+	CHECK(limiter.acquire("b").allowed);
+
+	// Global cap: 400 burst across owners
+	RateLimiter global(config, clock);
+	allowed = 0;
+	for (int owner = 0; owner < 10; ++owner) {
+		for (int i = 0; i < 60; ++i)
+			allowed += global.acquire("o" + std::to_string(owner)).allowed ? 1 : 0;
+	}
+	CHECK(allowed == 400);
+	RateLimiter::Decision d = global.acquire("fresh");
+	CHECK(!d.allowed);
+	CHECK(d.retry_after_ms == 5); // 1 token at 200/s = 5 ms
+	*now += 5ms;
+	CHECK(global.acquire("fresh").allowed);
+
+	// Many distinct owner names don't grow the map without bound
+	RateLimiter many(config, clock);
+	for (int i = 0; i < 2000; ++i)
+		many.acquire("owner" + std::to_string(i));
+	*now += 10s;
+	CHECK(many.acquire("after").allowed);
+}
+
+void test_log_limiter()
+{
+	auto now = std::make_shared<Clock::time_point>(Clock::time_point{} + 1h);
+	LogLimiter limiter(10s, [now] { return *now; });
+
+	LogLimiter::Verdict v = limiter.check("x");
+	CHECK(v.log && v.suppressed == 0);
+	for (int i = 0; i < 5; ++i)
+		CHECK(!limiter.check("x").log);
+	CHECK(limiter.check("y").log); // other keys are independent
+	*now += 9s;
+	CHECK(!limiter.check("x").log);
+	*now += 1s; // window over: logged again, with the count
+	v = limiter.check("x");
+	CHECK(v.log && v.suppressed == 6);
+	CHECK(LogLimiter::suffix(v) == " (6 similar lines suppressed in the last 10 s)");
+	CHECK(LogLimiter::suffix(LogLimiter::Verdict{true, 1}) == " (1 similar line suppressed in the last 10 s)");
+	CHECK(LogLimiter::suffix(LogLimiter::Verdict{}).empty());
+	*now += 30s; // quiet: next one is a plain first line
+	v = limiter.check("x");
+	CHECK(v.log && v.suppressed == 0);
+
+	// Many distinct keys don't grow without bound, and a key with suppressed
+	// lines keeps its count
+	for (int i = 0; i < 1500; ++i)
+		limiter.check("k" + std::to_string(i));
+	CHECK(!limiter.check("x").log);
+	*now += 11s;
+	for (int i = 0; i < 1500; ++i)
+		limiter.check("m" + std::to_string(i));
+	v = limiter.check("x");
+	CHECK(v.log && v.suppressed == 1);
+}
+
 void test_label_bind_and_replace_warning()
 {
 	Fixture f;
@@ -838,6 +943,9 @@ int main()
 	test_event_data();
 	test_registration_events();
 	test_label_bind_and_replace_warning();
+	test_printable();
+	test_rate_limiter();
+	test_log_limiter();
 	test_dock_logic();
 	test_state_events();
 	test_snapshots();

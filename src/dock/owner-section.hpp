@@ -27,6 +27,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <vector>
 
 #include <QFrame>
+#include <QPointer>
 
 #include <nlohmann/json.hpp>
 
@@ -34,6 +35,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 class QCheckBox;
 class QLabel;
+class QMessageBox;
 class QPushButton;
 class QToolButton;
 class QVBoxLayout;
@@ -58,6 +60,8 @@ public:
 	bool stale() const { return stale_; }
 
 	void set_stale(bool stale);
+	// Closes an open confirm dialog without running its command (OBS exit)
+	void close_dialogs();
 	// changes: the registry's change set (deleted keys are null)
 	void apply_changes(const nlohmann::json &changes);
 
@@ -69,6 +73,7 @@ private:
 	QWidget *build_control(const nlohmann::json &control);
 	QWidget *with_label(const nlohmann::json &control, QWidget *input);
 	void run_button(const nlohmann::json &button);
+	void send_button(const nlohmann::json &button);
 	void send(const std::string &command, const nlohmann::json &args);
 	void show_error(const QString &text);
 	void refresh_bound(const std::string &key);
@@ -88,6 +93,7 @@ private:
 	QPushButton *remove_button_ = nullptr;
 	QWidget *content_ = nullptr;
 	QLabel *status_ = nullptr;
+	QPointer<QMessageBox> confirm_; // the open confirm dialog, if any
 
 	std::multimap<std::string, QLabel *> labels_;     // state key -> bound labels
 	std::multimap<std::string, QCheckBox *> toggles_; // state key -> bound toggles

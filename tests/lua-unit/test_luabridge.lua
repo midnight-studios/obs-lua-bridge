@@ -276,6 +276,40 @@ function tests.commands_dispatch_by_owner(fake, load)
 	truthy(logged, "handler error logged")
 end
 
+function tests.handler_failures_are_deduplicated(fake, load)
+	local now = 5000
+	os.time = function() return now end
+	local bridge = load()
+	bridge.register("a", { display_name = "A" })
+	bridge.on_command("a", function() error("always fails") end)
+	local function failures()
+		local lines = {}
+		for _, l in ipairs(fake.logs) do
+			if l.msg:find("command handler for 'a' failed", 1, true) then
+				lines[#lines + 1] = l.msg
+			end
+		end
+		return lines
+	end
+	for _ = 1, 50 do
+		fake.send_command("a", "go", "{}", "dock")
+	end
+	eq(#failures(), 1, "logged once in 10 s")
+	now = now + 9
+	fake.send_command("a", "go", "{}", "dock")
+	eq(#failures(), 1, "still inside the window")
+	now = now + 1
+	fake.send_command("a", "go", "{}", "dock")
+	local lines = failures()
+	eq(#lines, 2, "logged again after 10 s")
+	contains(lines[2], "(50 similar lines suppressed in the last 10 s)")
+	now = now + 60
+	fake.send_command("a", "go", "{}", "dock")
+	lines = failures()
+	eq(#lines, 3)
+	eq(lines[3]:find("suppressed", 1, true), nil, "a quiet period starts fresh")
+end
+
 function tests.events_dispatch(fake, load)
 	local bridge = load()
 	local got = {}

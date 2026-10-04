@@ -157,7 +157,8 @@ std::string LuaBridgeDock::send_command(const std::string &owner, const std::str
 	std::string args_json;
 	Result r = registry_.check_command(owner, command, args.dump(), &args_json);
 	if (!r.ok) {
-		obs_log(LOG_WARNING, "dock %s(%s): %s", command.c_str(), owner.c_str(), r.error.c_str());
+		obs_log(LOG_WARNING, "dock %s(%s): %s", printable(command).c_str(), printable(owner).c_str(),
+			r.error.c_str());
 		return r.error;
 	}
 	emitter_.command(owner, command, args_json, "dock");
@@ -169,13 +170,19 @@ void LuaBridgeDock::remove_owner(const std::string &owner)
 	bool removed = false;
 	unregister_and_notify(registry_, owner, events_, &removed);
 	if (removed)
-		obs_log(LOG_INFO, "removed stale owner '%s' from the dock", owner.c_str());
+		obs_log(LOG_INFO, "removed stale owner '%s' from the dock", printable(owner).c_str());
 	schedule_reconcile();
 }
 
 void LuaBridgeDock::update_placeholder()
 {
 	stack_->setCurrentWidget(sections_.empty() ? stack_->widget(0) : scroll_);
+}
+
+void LuaBridgeDock::close_dialogs()
+{
+	for (const auto &[owner, section] : sections_)
+		section->close_dialogs();
 }
 
 void LuaBridgeDock::apply_state_changes(const std::string &owner, const std::string &changes_json)

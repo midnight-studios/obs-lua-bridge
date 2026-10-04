@@ -50,6 +50,8 @@ public:
 	void schedule_reconcile();
 	// changes_json: the registry's change set for owner (deleted keys are null)
 	void apply_state_changes(const std::string &owner, const std::string &changes_json);
+	// Closes open confirm dialogs without running their commands (OBS exit)
+	void close_dialogs();
 
 private:
 	void reconcile();

@@ -12,11 +12,16 @@
 -- Reset, and +/- seconds; websocket clients can send the same commands.
 -- Without the plugin: use the buttons in this script's properties; the time
 -- is shown in the chosen text source either way.
+--
+-- To run two stopwatches, copy this file under another name and give the copy
+-- an Instance ID in its properties (e.g. "2" -> owner "stopwatch.2").
 
 local bridge = dofile(script_path() .. "../luabridge.lua")
 local obs = obslua
 
-local OWNER = "stopwatch"
+local BASE_OWNER = "stopwatch"
+local owner = BASE_OWNER -- or "stopwatch.<instance id>" for a duplicated script
+local registered = false
 local TICK_MS = 200
 
 local REGISTRATION = {
@@ -48,6 +53,30 @@ local REGISTRATION = {
 		},
 	},
 }
+
+
+-- "stopwatch" for an empty instance ID, "stopwatch.2" for "2"; IDs may use a-z, 0-9,
+-- _ and - (anything else is dropped)
+local function instance_owner(id)
+	local cleaned = (id or ""):lower():gsub("[^a-z0-9_-]", "")
+	if cleaned == "" then
+		return BASE_OWNER
+	end
+	return BASE_OWNER .. "." .. cleaned:sub(1, 64 - #BASE_OWNER - 1)
+end
+
+-- The registration for the current owner: duplicates get the instance ID in
+-- their display name
+local function registration_for(current)
+	local registration = {}
+	for k, v in pairs(REGISTRATION) do
+		registration[k] = v
+	end
+	if current ~= BASE_OWNER then
+		registration.display_name = REGISTRATION.display_name .. " " .. current:sub(#BASE_OWNER + 2)
+	end
+	return registration
+end
 
 local running = false
 local accumulated_ns = 0 -- time counted before the current run
@@ -96,7 +125,7 @@ local function show(force)
 	elseif seconds > 0 then
 		toggle_label = "Resume"
 	end
-	bridge.set_state(OWNER, { display = display, elapsed = seconds, running = running, toggle_label = toggle_label })
+	bridge.set_state(owner, { display = display, elapsed = seconds, running = running, toggle_label = toggle_label })
 end
 
 local function start()
@@ -162,6 +191,8 @@ end
 
 function script_properties()
 	local props = obs.obs_properties_create()
+	obs.obs_properties_add_text(props, "instance_id", "Instance ID (optional, for duplicated scripts)",
+		obs.OBS_TEXT_DEFAULT)
 	local list = obs.obs_properties_add_list(props, "text_source", "Text source", obs.OBS_COMBO_TYPE_EDITABLE,
 		obs.OBS_COMBO_FORMAT_STRING)
 	local sources = obs.obs_enum_sources()
@@ -194,21 +225,37 @@ function script_properties()
 	return props
 end
 
+local function on_command(command, args)
+	local handler = commands[command]
+	if handler then
+		handler(args)
+	end
+end
+
+-- (Re-)registers under the owner for the configured instance ID. All calls just
+-- return false when the plugin isn't installed.
+local function apply_instance(settings)
+	local wanted = instance_owner(obs.obs_data_get_string(settings, "instance_id"))
+	if wanted == owner and registered then
+		return
+	end
+	if registered then
+		bridge.unregister(owner)
+	end
+	owner = wanted
+	registered = bridge.register(owner, registration_for(owner))
+	bridge.on_command(owner, on_command)
+end
+
 function script_update(settings)
 	text_source = obs.obs_data_get_string(settings, "text_source")
+	apply_instance(settings)
 	show(true)
 end
 
 function script_load(settings)
 	text_source = obs.obs_data_get_string(settings, "text_source")
-	-- Both calls just return false when the plugin isn't installed
-	bridge.register(OWNER, REGISTRATION)
-	bridge.on_command(OWNER, function(command, args)
-		local handler = commands[command]
-		if handler then
-			handler(args)
-		end
-	end)
+	apply_instance(settings)
 	show(true)
 	obs.timer_add(tick, TICK_MS)
 end

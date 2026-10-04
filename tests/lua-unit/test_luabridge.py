@@ -1,4 +1,7 @@
-"""Runs the Lua unit tests for lua/luabridge.lua (tests in test_luabridge.lua).
+"""Runs the Lua unit tests for lua/luabridge.lua and the example scripts.
+
+Tests are in test_luabridge.lua (the helper) and test_examples.lua (the
+examples never log a warning in normal use, with or without the plugin).
 
 Uses lupa's LuaJIT 2.1 runtime, the same Lua that OBS embeds, so Lua 5.1
 compatibility is tested for real. Install with:  py -m pip install lupa
@@ -18,8 +21,9 @@ except ImportError as exc:  # pragma: no cover
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 HELPER = (ROOT / "lua" / "luabridge.lua").as_posix()
+EXAMPLES = (ROOT / "lua" / "examples").as_posix() + "/"
 FAKE = (HERE / "fake_obslua.lua").as_posix()
-TESTS = (HERE / "test_luabridge.lua").as_posix()
+TEST_FILES = [(HERE / name).as_posix() for name in ("test_luabridge.lua", "test_examples.lua")]
 
 
 def new_runtime():
@@ -34,27 +38,38 @@ def new_runtime():
 def main():
     probe = new_runtime()
     print(f"runtime: {probe.eval('jit.version')} ({probe.eval('_VERSION')})")
-    names = sorted(probe.execute(f"return dofile('{TESTS}')").keys())
 
-    failed = 0
-    for name in names:
-        lua = new_runtime()
-        ok, err = lua.execute(
-            f"""
-            local fake = dofile('{FAKE}')
-            local tests = dofile('{TESTS}')
-            local function load_helper() return dofile('{HELPER}') end
-            local ok, err = pcall(tests['{name}'], fake, load_helper)
-            return ok, err and tostring(err) or nil
-            """
-        )
-        if ok:
-            print(f"PASS {name}")
-        else:
-            failed += 1
-            print(f"FAIL {name}: {err}")
+    failed = total = 0
+    for tests_file in TEST_FILES:
+        names = sorted(probe.execute(f"return dofile('{tests_file}')").keys())
+        for name in names:
+            total += 1
+            lua = new_runtime()
+            run = lua.eval(
+                f"""
+                function(name)
+                    local fake = dofile('{FAKE}')
+                    local tests = dofile('{tests_file}')
+                    local function load_helper() return dofile('{HELPER}') end
+                    -- Loads an example as OBS does: script_path() is its folder
+                    local function load_example(file)
+                        script_properties, script_update = nil, nil
+                        script_path = function() return '{EXAMPLES}' end
+                        dofile('{EXAMPLES}' .. file)
+                    end
+                    local ok, err = pcall(tests[name], fake, load_helper, load_example)
+                    return ok, err and tostring(err) or nil
+                end
+                """
+            )
+            ok, err = run(name)
+            if ok:
+                print(f"PASS {name}")
+            else:
+                failed += 1
+                print(f"FAIL {name}: {err}")
 
-    print(f"{len(names) - failed} passed, {failed} failed")
+    print(f"{total - failed} passed, {failed} failed")
     return 1 if failed else 0
 
 

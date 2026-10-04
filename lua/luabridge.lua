@@ -361,6 +361,26 @@ local function log(level, message)
 	obs.script_log(level, "[luabridge] " .. message)
 end
 
+-- Like log(), but the same key within 10 s is counted instead of logged again;
+-- the next line after that says how many were suppressed
+local LOG_WINDOW_S = 10
+local limited = {}
+local function log_limited(key, level, message)
+	local now = os.time()
+	local entry = limited[key]
+	if entry and now - entry.logged < LOG_WINDOW_S then
+		entry.suppressed = entry.suppressed + 1
+		return
+	end
+	local suffix = ""
+	if entry and entry.suppressed > 0 then
+		suffix = string.format(" (%d similar line%s suppressed in the last %d s)", entry.suppressed,
+			entry.suppressed == 1 and "" or "s", LOG_WINDOW_S)
+	end
+	limited[key] = { logged = now, suppressed = 0 }
+	log(level, message .. suffix)
+end
+
 -- Calls a procedure with string arguments.
 -- Returns found, ok, error, json (json is only set by luabridge_get_info).
 local function call(proc, args)
@@ -545,7 +565,8 @@ local function send_heartbeat(owner)
 	if o and o.on_heartbeat then
 		local called, cb_err = pcall(o.on_heartbeat, ok, err)
 		if not called then
-			log(obs.LOG_WARNING, "heartbeat callback for '" .. owner .. "' failed: " .. tostring(cb_err))
+			log_limited("heartbeat:" .. owner, obs.LOG_WARNING,
+				"heartbeat callback for '" .. owner .. "' failed: " .. tostring(cb_err))
 		end
 	end
 	return ok, err
@@ -573,7 +594,8 @@ local function on_command_signal(cd)
 	end
 	local ok, err = pcall(handler, command, args, origin)
 	if not ok then
-		log(obs.LOG_WARNING, "command handler for '" .. tostring(owner) .. "' failed: " .. tostring(err))
+		log_limited("command:" .. tostring(owner), obs.LOG_WARNING,
+			"command handler for '" .. tostring(owner) .. "' failed: " .. tostring(err))
 	end
 end
 
@@ -584,10 +606,10 @@ local function on_event_signal(cd)
 	if type(data) ~= "table" then
 		data = M.object({})
 	end
-	for _, handler in ipairs(event_handlers) do
+	for index, handler in ipairs(event_handlers) do
 		local ok, err = pcall(handler, owner, event, data)
 		if not ok then
-			log(obs.LOG_WARNING, "event handler failed: " .. tostring(err))
+			log_limited("event:" .. index, obs.LOG_WARNING, "event handler failed: " .. tostring(err))
 		end
 	end
 end

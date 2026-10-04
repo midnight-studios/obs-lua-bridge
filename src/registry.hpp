@@ -64,6 +64,11 @@ bool is_valid_state_key(std::string_view key);
 // Same rule as state keys
 bool is_valid_event_name(std::string_view name);
 
+// Text from outside (owner ids, command names) made safe for the log: printable
+// ASCII only (anything else, incl. bidi overrides and control characters, becomes
+// '?'), at most 64 characters (then "...")
+std::string printable(std::string_view text);
+
 enum class ArgType { Int, Number, String, Bool };
 
 struct Command {

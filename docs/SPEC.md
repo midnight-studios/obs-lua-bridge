@@ -347,8 +347,8 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - Stress test: 10 owners, 1,000 commands per minute from websocket, for 1 hour. Watch memory in Task Manager.
 - Clean shutdown: exit OBS while commands are in flight. No crash and no "signal not found" warnings.
 - Test with Studio Mode on and off, with scene collection switches, and with multiple duplicated script instances.
-- Rate limiting / flood protection for websocket `RunCommand`.
-- Reduce the `[lua-bridge] registered owner '…'` / `unregistered owner '…'` log lines (`src/procs.cpp`) from info to debug level. They're useful during development, but users with many scripts would see them on every start and exit.
+- ☑ Rate limiting / flood protection for websocket `RunCommand` (30/s per owner, burst 60; 200/s global; see API.md).
+- ☑ Reduce the `[lua-bridge] registered owner '…'` / `unregistered owner '…'` log lines (`src/procs.cpp`) from info to debug level. They're useful during development, but users with many scripts would see them on every start and exit.
 
 ### M6 — Packaging and CI (1–2 days)
 - The release package ships `luabridge.lua` and the examples in a layout that matches the documented "copy `luabridge.lua` next to your script" instruction (e.g. `lua/luabridge.lua` plus `lua/examples/…` that load `../luabridge.lua`, or each example folder with its own copy).

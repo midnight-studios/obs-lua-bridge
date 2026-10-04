@@ -6,11 +6,16 @@
 -- which obs-websocket clients receive as a LuaBridge CustomEvent.
 -- Without the plugin: use the buttons in this script's properties; the score
 -- is shown in the chosen text source either way.
+--
+-- To run two score boards, copy this file under another name and give the
+-- copy an Instance ID in its properties (e.g. "2" -> owner "scoreboard.2").
 
 local bridge = dofile(script_path() .. "../luabridge.lua")
 local obs = obslua
 
-local OWNER = "scoreboard"
+local BASE_OWNER = "scoreboard"
+local owner = BASE_OWNER -- or "scoreboard.<instance id>" for a duplicated script
+local registered = false
 local EN_DASH = "\226\128\147"
 
 local REGISTRATION = {
@@ -36,6 +41,30 @@ local REGISTRATION = {
 	},
 }
 
+
+-- "scoreboard" for an empty instance ID, "scoreboard.2" for "2"; IDs may use a-z, 0-9,
+-- _ and - (anything else is dropped)
+local function instance_owner(id)
+	local cleaned = (id or ""):lower():gsub("[^a-z0-9_-]", "")
+	if cleaned == "" then
+		return BASE_OWNER
+	end
+	return BASE_OWNER .. "." .. cleaned:sub(1, 64 - #BASE_OWNER - 1)
+end
+
+-- The registration for the current owner: duplicates get the instance ID in
+-- their display name
+local function registration_for(current)
+	local registration = {}
+	for k, v in pairs(REGISTRATION) do
+		registration[k] = v
+	end
+	if current ~= BASE_OWNER then
+		registration.display_name = REGISTRATION.display_name .. " " .. current:sub(#BASE_OWNER + 2)
+	end
+	return registration
+end
+
 local home, away = 0, 0
 local text_source = ""
 
@@ -58,9 +87,9 @@ end
 local function publish(changed)
 	local display = home .. " " .. EN_DASH .. " " .. away
 	set_text(text_source, display)
-	bridge.set_state(OWNER, { home = home, away = away, display = display })
+	bridge.set_state(owner, { home = home, away = away, display = display })
 	if changed then
-		bridge.emit(OWNER, "score.changed", { home = home, away = away })
+		bridge.emit(owner, "score.changed", { home = home, away = away })
 	end
 end
 
@@ -85,6 +114,8 @@ end
 
 function script_properties()
 	local props = obs.obs_properties_create()
+	obs.obs_properties_add_text(props, "instance_id", "Instance ID (optional, for duplicated scripts)",
+		obs.OBS_TEXT_DEFAULT)
 	local list = obs.obs_properties_add_list(props, "text_source", "Text source", obs.OBS_COMBO_TYPE_EDITABLE,
 		obs.OBS_COMBO_FORMAT_STRING)
 	local sources = obs.obs_enum_sources()
@@ -108,20 +139,36 @@ function script_properties()
 	return props
 end
 
+local function on_command(command)
+	if commands[command] then
+		run(command)
+	end
+end
+
+-- (Re-)registers under the owner for the configured instance ID. All calls just
+-- return false when the plugin isn't installed.
+local function apply_instance(settings)
+	local wanted = instance_owner(obs.obs_data_get_string(settings, "instance_id"))
+	if wanted == owner and registered then
+		return
+	end
+	if registered then
+		bridge.unregister(owner)
+	end
+	owner = wanted
+	registered = bridge.register(owner, registration_for(owner))
+	bridge.on_command(owner, on_command)
+end
+
 function script_update(settings)
 	text_source = obs.obs_data_get_string(settings, "text_source")
+	apply_instance(settings)
 	publish(false)
 end
 
 function script_load(settings)
 	text_source = obs.obs_data_get_string(settings, "text_source")
-	-- These calls just return false when the plugin isn't installed
-	bridge.register(OWNER, REGISTRATION)
-	bridge.on_command(OWNER, function(command)
-		if commands[command] then
-			run(command)
-		end
-	end)
+	apply_instance(settings)
 	publish(false)
 end
 
