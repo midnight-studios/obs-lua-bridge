@@ -1,15 +1,18 @@
 -- hello-bridge.lua: minimal Lua Bridge for OBS example
 --
 -- At load, asks the plugin for its info, registers the owner "hello" with a
--- "ping" command, and connects to the luabridge_command signal. Logs
--- "ping received" when the Tools menu item "Lua Bridge: Send test ping
--- (temporary)" is clicked. Without the plugin installed, the script logs that
--- and otherwise does nothing.
+-- "ping" command and a small dock section (a Ping button and the time of the
+-- last ping), and connects to the luabridge_command signal. Click Ping in the
+-- Lua Bridge dock (Docks > Lua Bridge) and the script logs "ping received" and
+-- updates the label. Without the plugin installed, the script logs that and
+-- otherwise does nothing.
 
 local obs = obslua
 
 local OWNER = "hello"
-local REGISTRATION = '{"display_name":"Hello Bridge","commands":[{"id":"ping","label":"Ping"}]}'
+local REGISTRATION = '{"display_name":"Hello Bridge",'
+	.. '"commands":[{"id":"ping","label":"Ping","description":"Send a ping to hello-bridge.lua"}],'
+	.. '"dock":[{"type":"label","bind":"last_ping"},{"type":"button","command":"ping"}]}'
 
 local connected = false
 
@@ -44,6 +47,7 @@ local function on_command(cd)
 
 	if command == "ping" then
 		log(string.format("ping received (owner=%s, origin=%s, json=%s)", owner, origin, json))
+		call("luabridge_set_state", { owner = OWNER, json = '{"last_ping":"Last ping: ' .. os.date("%H:%M:%S") .. '"}' })
 	else
 		log(string.format("unknown command '%s' (origin=%s)", tostring(command), tostring(origin)))
 	end
@@ -51,7 +55,7 @@ end
 
 function script_description()
 	return "Lua Bridge for OBS: minimal example. Logs the plugin info at load and "
-		.. "\"ping received\" when you click Tools > Lua Bridge: Send test ping (temporary)."
+		.. "\"ping received\" when you click Ping in the Lua Bridge dock (Docks > Lua Bridge)."
 end
 
 function script_load(settings)

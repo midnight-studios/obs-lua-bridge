@@ -20,6 +20,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 #include <plugin-support.h>
 
+#include "dock/dock-events.hpp"
+#include "dock/lua-bridge-dock.hpp"
+#include "fan-out-sink.hpp"
 #include "procs.hpp"
 #include "signals.hpp"
 #include "websocket-vendor.hpp"
@@ -29,17 +32,39 @@ OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
 
 namespace {
 
-// TEMPORARY (remove in M3, when the dock sends commands): Tools menu item that
-// sends "ping" to the "hello" owner registered by lua/examples/hello-bridge.lua
-void on_send_test_ping_clicked(void *)
+constexpr const char *dock_id = "lua-bridge";
+bool dock_added = false;
+
+// Notifications go to obs-websocket clients and to the dock
+luabridge::EventSink &event_sinks()
 {
-	luabridge::Result r = luabridge::registry().check_command("hello", "ping", "{}");
-	if (!r.ok) {
-		obs_log(LOG_WARNING, "test ping: %s", r.error.c_str());
+	static luabridge::FanOutEventSink sinks{&luabridge::websocket::events(), &luabridge::dock::events()};
+	return sinks;
+}
+
+void create_dock()
+{
+	auto *dock = new luabridge::dock::LuaBridgeDock(luabridge::registry(), luabridge::signaling::emitter(),
+							event_sinks());
+	if (!obs_frontend_add_dock_by_id(dock_id, obs_module_text("LuaBridge.Dock.Title"), dock)) {
+		obs_log(LOG_WARNING, "could not add the Lua Bridge dock");
+		delete dock;
 		return;
 	}
-	obs_log(LOG_INFO, "test ping: emitting luabridge_command(hello, ping, {}, dock)");
-	luabridge::signaling::emitter().command("hello", "ping", "{}", "dock");
+	dock_added = true;
+	luabridge::dock::attach_events(dock);
+}
+
+void remove_dock()
+{
+	luabridge::dock::detach_events();
+	if (dock_added) {
+		// OBS saved the dock layout before OBS_FRONTEND_EVENT_EXIT, so its
+		// position is kept; removing it now destroys our widgets while the
+		// plugin is still fully alive
+		obs_frontend_remove_dock(dock_id);
+		dock_added = false;
+	}
 }
 
 void on_frontend_event(enum obs_frontend_event event, void *)
@@ -54,6 +79,7 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 		luabridge::signaling::begin_shutdown();
 		// obs-websocket unloads before this plugin; stop using it now
 		luabridge::websocket::stop();
+		remove_dock();
 		break;
 	default:
 		break;
@@ -67,11 +93,10 @@ bool obs_module_load(void)
 	// Declared here so the signals exist before any script connects to them
 	luabridge::signaling::declare();
 	luabridge::signaling::start();
-	luabridge::register_procs(luabridge::signaling::emitter(), luabridge::websocket::events());
+	luabridge::register_procs(luabridge::signaling::emitter(), event_sinks());
 	luabridge::enable_procs();
 
-	obs_frontend_add_tools_menu_item(obs_module_text("LuaBridge.Menu.SendTestPing"), on_send_test_ping_clicked,
-					 nullptr);
+	create_dock();
 	obs_frontend_add_event_callback(on_frontend_event, nullptr);
 
 	obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
@@ -92,7 +117,7 @@ void obs_module_unload(void)
 	luabridge::disable_procs();
 	luabridge::signaling::stop();
 	luabridge::registry().clear();
-	// The frontend event callback is not removed: the frontend API is already
-	// gone by now (it is torn down after OBS_FRONTEND_EVENT_EXIT).
+	// The frontend event callback is not removed, and the dock was already
+	// removed at OBS_FRONTEND_EVENT_EXIT: the frontend API is gone by now.
 	obs_log(LOG_INFO, "plugin unloaded");
 }

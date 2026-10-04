@@ -92,9 +92,9 @@ Every script connected to `luabridge_command` receives every command, so filter 
 - **`dock`:** optional, at most 256 controls in total, counting row items. The control types are:
   - `label`: needs `bind` (a state key); `style` is optional.
   - `button`: needs `command` (a declared command); `args_from` is optional and maps declared args to `number`/`text` control IDs.
-  - `toggle`: needs `bind` and `command`; it sends `{"value": true|false}`.
-  - `number`: needs a unique `id`; `min`, `max` and `default` are optional, with min ≤ default ≤ max.
-  - `text`: needs a unique `id`; `default` is optional, ≤ 256 bytes.
+  - `toggle`: needs `bind` and `command`; it sends `{"value": true|false}`, so the command must declare an arg `value` of type `bool`.
+  - `number`: needs a unique `id`; `min`, `max` and `default` are optional, with min ≤ default ≤ max. `label` (text shown next to it) is optional.
+  - `text`: needs a unique `id`; `default` is optional, ≤ 256 bytes. `label` is optional.
   - `row`: holds `items`; rows can't be nested.
   - `separator`.
 
@@ -142,6 +142,34 @@ For `emit` and `run_command`, an empty `json` counts as `{}`. `run_command` chec
 - `int` must be a whole number;
 - missing args are allowed;
 - a `null` value counts as a missing arg. It's removed before the command is delivered, so scripts never receive `null` args. This applies to commands from scripts, the dock and websocket alike.
+
+## The dock
+
+The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one collapsible section per registered owner, titled with its `display_name`, in registration order. OBS remembers the dock's position, size and visibility. When no owner is registered, the dock shows a short placeholder text.
+
+**How the controls appear:**
+
+| Control | Shown as | What it does |
+|---|---|---|
+| `label` | Text bound to a state key | Shows the key's value (strings as-is, numbers in shortest form, `true`/`false`, `—` when not set) and updates as soon as the script calls `luabridge_set_state`. `style: "large"` shows it large and bold. |
+| `button` | A button with the command's `label` (tooltip: `description`) | Sends the command with `origin = "dock"`. With `confirm: true` it asks first. `args_from` fills args from `number`/`text` controls. |
+| `row` | Its items side by side | Buttons share the width. |
+| `number` | A spin box (whole numbers, or 3 decimals if `min`, `max` or `default` isn't whole) | Holds a value for buttons; sends nothing by itself. |
+| `text` | A text field | Holds a value for buttons; sends nothing by itself. |
+| `toggle` | A checkbox with the command's `label`, checked when the bound key is `true` | A click sends `{"value": <new>}`. The box then shows the **state again** until the script sets it, so it always shows the script's view. |
+| `separator` | A horizontal line | — |
+
+**Commands from the dock:**
+- They're validated like any other command. A failure (for example `owner is stale; register again`) appears under the section for a few seconds and is logged.
+- They reach the script asynchronously on the UI thread, like commands from scripts and websocket.
+
+**Reloading a script** replaces its section in place, with no duplicates, keeping its position and whether it was collapsed.
+
+**Stale owners:**
+- When an owner that sends heartbeats goes stale (see [Heartbeat](#heartbeat)), its section stays but its controls are disabled and the title shows "— not responding".
+- A **Remove** button appears in the section's title. It unregisters the owner, exactly like `luabridge_unregister`: the section disappears, and websocket clients no longer list the owner. This clears sections left behind by scripts that crashed or were removed without unregistering.
+- If the script is still running, its `set_state`/`emit` calls now fail with `owner not registered`. That's the cue to call `luabridge_register` again, after which the section reappears.
+- Only stale sections can be removed from the dock.
 
 ## obs-websocket vendor API
 

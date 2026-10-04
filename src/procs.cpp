@@ -71,7 +71,7 @@ void proc_get_info(void *, calldata_t *cd)
 void proc_register(void *, calldata_t *cd)
 {
 	auto owner = arg(cd, "owner");
-	Result r = registry().register_owner(owner, arg(cd, "json"));
+	Result r = register_and_notify(registry(), owner, arg(cd, "json"), *events);
 	if (r.ok)
 		obs_log(LOG_INFO, "registered owner '%.*s'", (int)owner.size(), owner.data());
 	finish(cd, "luabridge_register", owner, r);
@@ -81,7 +81,7 @@ void proc_unregister(void *, calldata_t *cd)
 {
 	auto owner = arg(cd, "owner");
 	bool removed = false;
-	Result r = registry().unregister_owner(owner, &removed);
+	Result r = unregister_and_notify(registry(), owner, *events, &removed);
 	// Unregistering an unknown owner is a silent no-op
 	if (removed)
 		obs_log(LOG_INFO, "unregistered owner '%.*s'", (int)owner.size(), owner.data());

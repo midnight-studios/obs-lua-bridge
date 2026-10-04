@@ -31,4 +31,23 @@ Result set_state_and_notify(Registry &registry, std::string_view owner, std::str
 	return r;
 }
 
+Result register_and_notify(Registry &registry, std::string_view owner, std::string_view json, EventSink &events)
+{
+	Result r = registry.register_owner(owner, json);
+	if (r.ok)
+		events.owner_registered(std::string(owner));
+	return r;
+}
+
+Result unregister_and_notify(Registry &registry, std::string_view owner, EventSink &events, bool *removed)
+{
+	bool was_removed = false;
+	Result r = registry.unregister_owner(owner, &was_removed);
+	if (removed)
+		*removed = was_removed;
+	if (was_removed)
+		events.owner_unregistered(std::string(owner));
+	return r;
+}
+
 } // namespace luabridge
