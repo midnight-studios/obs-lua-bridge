@@ -351,6 +351,7 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - Reduce the `[lua-bridge] registered owner '…'` / `unregistered owner '…'` log lines (`src/procs.cpp`) from info to debug level. They're useful during development, but users with many scripts would see them on every start and exit.
 
 ### M6 — Packaging and CI (1–2 days)
+- The release package ships `luabridge.lua` and the examples in a layout that matches the documented "copy `luabridge.lua` next to your script" instruction (e.g. `lua/luabridge.lua` plus `lua/examples/…` that load `../luabridge.lua`, or each example folder with its own copy).
 - The template workflows build Windows, macOS, and Ubuntu on every push and PR. Fix any platform build errors Claude Code can't reproduce locally by reading the CI logs (`gh run view --log-failed`).
 - Pushing a semantic-version tag (for example `1.0.0`) creates a **draft GitHub release** with the platform artifacts attached.
 - Windows: the template packages a ZIP. Write install instructions (copy into `C:\ProgramData\obs-studio\plugins\`), or add an installer later.

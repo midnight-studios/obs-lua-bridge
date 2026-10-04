@@ -319,6 +319,26 @@ function tests.heartbeat_timer(fake, load)
 	contains(err, "was not registered by this script")
 end
 
+function tests.heartbeat_callback(fake, load)
+	local bridge = load()
+	local seen = {}
+	bridge.register("a", { display_name = "A" }, {
+		on_heartbeat = function(ok, err) seen[#seen + 1] = tostring(ok) .. ":" .. tostring(err) end,
+	})
+	bridge.register("b", { display_name = "B" }, { on_heartbeat = function() error("boom") end })
+	local tick = fake.timer()
+	tick()
+	eq(seen[1], "true:nil", "called after a successful heartbeat")
+	fake.fail_next.luabridge_heartbeat = "some error"
+	bridge.set_heartbeat("a", true)
+	eq(seen[2], "false:some error", "called with the error")
+	local logged = false
+	for _, l in ipairs(fake.logs) do
+		logged = logged or l.msg:find("heartbeat callback for 'b' failed", 1, true) ~= nil
+	end
+	truthy(logged, "callback error logged, not thrown")
+end
+
 function tests.reregisters_after_removal(fake, load)
 	local now = 1000
 	os.time = function() return now end

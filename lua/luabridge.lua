@@ -538,9 +538,17 @@ local function update_timer()
 end
 
 local function send_heartbeat(owner)
-	return with_reregistration(owner, function()
+	local ok, err = with_reregistration(owner, function()
 		return proc("luabridge_heartbeat", { owner = owner })
 	end)
+	local o = owners[owner]
+	if o and o.on_heartbeat then
+		local called, cb_err = pcall(o.on_heartbeat, ok, err)
+		if not called then
+			log(obs.LOG_WARNING, "heartbeat callback for '" .. owner .. "' failed: " .. tostring(cb_err))
+		end
+	end
+	return ok, err
 end
 
 heartbeat_tick = function()
@@ -592,6 +600,7 @@ end
 -- ({display_name=..., commands={...}, dock={...}}). options:
 --   heartbeat = true          send heartbeats (default true)
 --   heartbeat_interval = 10   seconds
+--   on_heartbeat = fn(ok, err) called after each heartbeat (e.g. to show it)
 -- Registering clears the owner's state in the plugin (and in this helper).
 function M.register(owner, registration, options)
 	if type(owner) ~= "string" then
@@ -612,6 +621,7 @@ function M.register(owner, registration, options)
 		state = {},
 		heartbeat = options.heartbeat ~= false,
 		interval = tonumber(options.heartbeat_interval) or HEARTBEAT_INTERVAL_S,
+		on_heartbeat = type(options.on_heartbeat) == "function" and options.on_heartbeat or nil,
 	}
 	update_timer()
 	return true

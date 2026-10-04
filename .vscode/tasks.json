@@ -15,6 +15,18 @@
       "problemMatcher": []
     },
     {
+      "label": "Run Lua helper unit tests",
+      "type": "shell",
+      "command": "py ${workspaceFolder}/tests/lua-unit/test_luabridge.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run example websocket tests",
+      "type": "shell",
+      "command": "py ${workspaceFolder}/tests/websocket/test_examples.py",
+      "problemMatcher": []
+    },
+    {
       "label": "Run websocket tests",
       "type": "shell",
       "command": "py ${workspaceFolder}/tests/websocket/test_vendor.py",
