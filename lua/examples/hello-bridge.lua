@@ -63,6 +63,11 @@ function script_load(settings)
 
 	log("info: " .. info)
 
+	-- capabilities is an object of flags, e.g. "capabilities":{"commands":true,...,"websocket":false}.
+	-- (A plain string search is enough here; the M4 helper library adds a JSON decoder.)
+	local websocket = info:find('"websocket":true', 1, true) ~= nil
+	log("obs-websocket integration: " .. (websocket and "available" or "not available"))
+
 	-- The signal only exists when the plugin is loaded, so connect only then
 	obs.signal_handler_connect(obs.obs_get_signal_handler(), "luabridge_command", on_command)
 	connected = true

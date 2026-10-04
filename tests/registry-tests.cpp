@@ -19,6 +19,8 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 // Unit tests for the registry (no OBS needed). Run with ctest or directly;
 // exits non-zero if any check fails.
 
+#include "event-data.hpp"
+#include "state-events.hpp"
 #include "registry.hpp"
 
 #include <cstdio>
@@ -361,6 +363,113 @@ void test_check_command()
 	CHECK_FAIL(f.reg.check_command("c", "add", R"({"on":1})"), "must be bool");
 	CHECK_FAIL(f.reg.check_command("c", "add", "[]"), "must be an object");
 	CHECK_FAIL(f.reg.check_command("c", "Bad", "{}"), "invalid command id");
+
+	// The arguments to forward: null means omitted and is removed, on every channel
+	std::string args;
+	CHECK_OK(f.reg.check_command("c", "add", R"({"seconds":5,"name":null})", &args));
+	CHECK(args == R"({"seconds":5})");
+	CHECK_OK(f.reg.check_command("c", "add", R"({"seconds":null})", &args));
+	CHECK(args == "{}");
+	CHECK_OK(f.reg.check_command("c", "add", R"({"undeclared":null})", &args));
+	CHECK(args == "{}");
+	CHECK_OK(f.reg.check_command("c", "add", "", &args));
+	CHECK(args == "{}");
+	CHECK_OK(f.reg.check_command("c", "add", "{\"rate\":0.1,\"name\":\"caf\xc3\xa9\",\"on\":false,\"seconds\":-3}",
+				     &args));
+	CHECK(args == "{\"name\":\"caf\xc3\xa9\",\"on\":false,\"rate\":0.1,\"seconds\":-3}");
+	args = "unchanged";
+	CHECK_FAIL(f.reg.check_command("c", "add", R"({"seconds":"x"})", &args), "must be int");
+	CHECK(args == "unchanged");
+}
+
+// Records what the procedures would send to obs-websocket
+struct FakeEventSink final : EventSink {
+	std::vector<std::pair<std::string, std::string>> state_calls; // owner, changes_json
+	std::vector<std::string> custom_calls;
+
+	void state_changed(const std::string &owner, const std::string &changes_json) override
+	{
+		state_calls.emplace_back(owner, changes_json);
+	}
+	void custom_event(const std::string &owner, const std::string &event, const std::string &json) override
+	{
+		custom_calls.push_back(owner + "/" + event + "/" + json);
+	}
+};
+
+void test_state_events()
+{
+	Fixture f;
+	FakeEventSink sink;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S"})"));
+
+	// Returns the StateChanged payload for the sink's last call, or "" if none was made
+	auto last_event = [&]() -> std::string {
+		if (sink.state_calls.empty())
+			return "";
+		const auto &[owner, changes] = sink.state_calls.back();
+		return event_data::state_changed(owner, changes).dump();
+	};
+
+	// Changes only
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"a":1,"b":"x"})", sink));
+	CHECK(sink.state_calls.size() == 1);
+	CHECK(last_event() == R"({"changes":{"a":1,"b":"x"},"owner":"s"})");
+
+	// Removed only
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"a":null})", sink));
+	CHECK(sink.state_calls.size() == 2);
+	CHECK(last_event() == R"({"changes":{},"owner":"s","removed":{"a":true}})");
+
+	// Both
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"b":"y","c":true,"a":null})", sink));
+	CHECK(sink.state_calls.size() == 3);
+	// "a" was already gone, so only b and c are reported, and there is no "removed"
+	CHECK(last_event() == R"({"changes":{"b":"y","c":true},"owner":"s"})");
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"b":"z","c":null})", sink));
+	CHECK(sink.state_calls.size() == 4);
+	CHECK(last_event() == R"({"changes":{"b":"z"},"owner":"s","removed":{"c":true}})");
+
+	// Empty result: nothing changed, so no event at all
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"b":"z"})", sink));
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"gone":null})", sink));
+	CHECK(sink.state_calls.size() == 4);
+
+	// A failed set_state sends nothing
+	CHECK_FAIL(set_state_and_notify(f.reg, "s", "{broken", sink), "invalid JSON");
+	CHECK_FAIL(set_state_and_notify(f.reg, "nobody", R"({"a":1})", sink), "owner not registered");
+	CHECK(sink.state_calls.size() == 4);
+	CHECK(sink.custom_calls.empty());
+}
+
+void test_event_data()
+{
+	using event_data::custom_event;
+	using event_data::state_changed;
+
+	CHECK(state_changed("o", R"({"a":1,"b":"x"})").dump() == R"({"changes":{"a":1,"b":"x"},"owner":"o"})");
+	CHECK(state_changed("o", R"({"a":null})").dump() == R"({"changes":{},"owner":"o","removed":{"a":true}})");
+	CHECK(state_changed("o", R"({"a":2,"b":null,"c":null})").dump() ==
+	      R"({"changes":{"a":2},"owner":"o","removed":{"b":true,"c":true}})");
+	// A registry change set round-trips into the event
+	Fixture f;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S"})"));
+	std::string changes;
+	CHECK_OK(f.reg.set_state("s", R"({"k":1,"t":"x"})", &changes));
+	CHECK_OK(f.reg.set_state("s", R"({"k":null,"t":"y"})", &changes));
+	CHECK(state_changed("s", changes).dump() == R"({"changes":{"t":"y"},"owner":"s","removed":{"k":true}})");
+
+	bool threw = false;
+	try {
+		state_changed("o", "{broken");
+	} catch (const nlohmann::json::exception &) {
+		threw = true;
+	}
+	CHECK(threw);
+
+	CHECK(custom_event("o", "e.x", R"({"items":[{"id":1}],"s":"v"})").dump() ==
+	      R"({"data":{"items":[{"id":1}],"s":"v"},"event":"e.x","owner":"o"})");
+	CHECK(custom_event("o", "e", "{}").dump() == R"({"data":{},"event":"e","owner":"o"})");
 }
 
 void test_check_emit()
@@ -374,6 +483,18 @@ void test_check_emit()
 	CHECK_FAIL(f.reg.check_emit("e", "big", "{\"p\":\"" + repeat('a', limits::max_json_bytes) + "\"}"),
 		   "json exceeds");
 	CHECK_FAIL(f.reg.check_emit("e", "x", "5"), "must be an object");
+
+	// obs_data can't carry null or arrays of non-objects, so they are rejected
+	const char *obs_data_error = "json cannot contain null or arrays of non-objects";
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"a":null})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"a":{"b":{"c":null}}})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"tags":["a","b"]})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"n":[1,2]})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"m":[{"ok":1},[{"x":1}]]})"), obs_data_error);
+	CHECK_FAIL(f.reg.check_emit("e", "x", R"({"m":[{"inner":[true]}]})"), obs_data_error);
+	CHECK_OK(f.reg.check_emit("e", "x", R"({"items":[{"id":1},{"id":2,"sub":{"s":"x"}}],"empty":[],"o":{}})"));
+	std::string deep = R"({"d":)" + repeat('[', 10000) + repeat(']', 10000) + "}";
+	CHECK_FAIL(f.reg.check_emit("e", "x", deep), obs_data_error);
 }
 
 void test_heartbeat_and_stale()
@@ -426,6 +547,52 @@ void test_robustness()
 	CHECK_FAIL(f.reg.register_owner(garbage, "{}"), "invalid owner id");
 }
 
+void test_snapshots()
+{
+	Fixture f;
+	CHECK(f.reg.list_owners().empty());
+	CHECK_OK(f.reg.register_owner("zeta", R"({"display_name":"Zeta"})"));
+	CHECK_OK(f.reg.register_owner(
+		"alpha",
+		R"({"display_name":"Alpha","commands":[{"id":"start","label":"Go","description":"d","confirm":true},)"
+		R"({"id":"add","args":{"seconds":"int","name":"string"}}]})"));
+
+	auto owners = f.reg.list_owners();
+	CHECK(owners.size() == 2);
+	CHECK(owners.size() == 2 && owners[0].id == "alpha" && owners[0].display_name == "Alpha" && !owners[0].stale);
+	CHECK(owners.size() == 2 && owners[1].id == "zeta" && owners[1].display_name == "Zeta");
+
+	CHECK_OK(f.reg.heartbeat("zeta"));
+	f.advance(31s);
+	owners = f.reg.list_owners();
+	CHECK(owners.size() == 2 && !owners[0].stale && owners[1].stale);
+
+	nlohmann::json commands;
+	CHECK_OK(f.reg.get_commands("alpha", commands));
+	CHECK(commands.dump() ==
+	      R"([{"args":{},"confirm":true,"description":"d","id":"start","label":"Go"},)"
+	      R"({"args":{"name":"string","seconds":"int"},"confirm":false,"description":"","id":"add","label":"add"}])");
+	CHECK_OK(f.reg.get_commands("zeta", commands));
+	CHECK(commands.dump() == "[]");
+	CHECK_FAIL(f.reg.get_commands("nobody", commands), "owner not registered");
+	CHECK_FAIL(f.reg.get_commands("Bad", commands), "invalid owner id");
+
+	nlohmann::json state;
+	CHECK_OK(f.reg.get_state("alpha", state));
+	CHECK(state.dump() == "{}");
+	CHECK_OK(f.reg.set_state("alpha", R"({"a":1,"b":"x","c":true})", nullptr));
+	CHECK_OK(f.reg.set_state("alpha", R"({"b":null})", nullptr));
+	CHECK_OK(f.reg.get_state("alpha", state));
+	CHECK(state.dump() == R"({"a":1,"c":true})");
+	// The snapshot is independent of later changes
+	CHECK_OK(f.reg.set_state("alpha", R"({"a":2})", nullptr));
+	CHECK(state.dump() == R"({"a":1,"c":true})");
+	CHECK_FAIL(f.reg.get_state("nobody", state), "owner not registered");
+
+	f.reg.clear();
+	CHECK(f.reg.list_owners().empty());
+}
+
 void test_threads()
 {
 	Fixture f;
@@ -439,6 +606,10 @@ void test_threads()
 				f.reg.check_command(owner, "c", "");
 				f.reg.check_emit(owner, "e", "");
 				f.reg.heartbeat(owner);
+				nlohmann::json snapshot;
+				f.reg.get_commands(owner, snapshot);
+				f.reg.get_state(owner, snapshot);
+				f.reg.list_owners();
 				if (i % 3 == 0)
 					f.reg.unregister_owner(owner);
 			}
@@ -468,6 +639,9 @@ int main()
 	test_check_emit();
 	test_heartbeat_and_stale();
 	test_robustness();
+	test_event_data();
+	test_state_events();
+	test_snapshots();
 	test_threads();
 
 	std::printf("registry-tests: %d checks, %d failed\n", checks, failures);

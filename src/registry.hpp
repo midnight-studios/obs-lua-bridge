@@ -82,6 +82,12 @@ struct Owner {
 	std::optional<Clock::time_point> last_heartbeat; // set by heartbeat() only
 };
 
+struct OwnerSummary {
+	std::string id;
+	std::string display_name;
+	bool stale = false;
+};
+
 struct Result {
 	bool ok = true;
 	std::string error;
@@ -109,11 +115,22 @@ public:
 	// Merges scalar key/values (null deletes). On success *changes_json receives an
 	// object with only the keys whose values changed.
 	Result set_state(std::string_view owner, std::string_view json, std::string *changes_json);
-	// Checks a luabridge_emit call. Empty json counts as {}.
+	// Checks a luabridge_emit call. Empty json counts as {}. The data may not
+	// contain null or arrays of non-objects, which obs-websocket cannot carry.
 	Result check_emit(std::string_view owner, std::string_view event, std::string_view json);
-	// Checks that a command may be sent to a script. Empty json counts as {}.
-	Result check_command(std::string_view owner, std::string_view command, std::string_view json);
+	// Checks that a command may be sent to a script. Empty json counts as {}, and
+	// null arguments count as omitted. On success *args_json (if given) receives
+	// the arguments to send to the script, with null arguments removed.
+	Result check_command(std::string_view owner, std::string_view command, std::string_view json,
+			     std::string *args_json = nullptr);
 	Result heartbeat(std::string_view owner);
+
+	// Read-only snapshots (copied under the lock) for obs-websocket and the dock
+	std::vector<OwnerSummary> list_owners() const; // sorted by id
+	// out = [{id, label, description, confirm, args:{name:type}}] in declaration order
+	Result get_commands(std::string_view owner, nlohmann::json &out) const;
+	// out = {key: value, ...}
+	Result get_state(std::string_view owner, nlohmann::json &out) const;
 
 	bool is_stale(std::string_view owner) const;
 	std::size_t owner_count() const;

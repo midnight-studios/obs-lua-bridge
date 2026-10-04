@@ -88,6 +88,8 @@ git config --global user.email "<your GitHub email>"
 
 ## Part B — Product specification
 
+> **Exact request/response shapes:** [docs/API.md](API.md) is the authoritative reference. This part describes intent, and where the two differ, API.md wins.
+
 ### B1. Goals for v1.0
 1. Scripts can register **commands** that are reachable from a dock button and from obs-websocket.
 2. Scripts can **publish state** (key/value pairs) that the dock displays and websocket clients can read.
@@ -134,12 +136,13 @@ Registered on `obs_get_proc_handler()`. Every procedure returns `out bool ok` an
 
 | Procedure | Inputs | Outputs | Purpose |
 |---|---|---|---|
-| `luabridge_get_info` | — | `string json` | `{api_version, plugin_version, obs_version, capabilities[]}`. If this call returns false, the plugin is absent and the script falls back |
+| `luabridge_get_info` | — | `string json` | `{api_version, plugin_version, obs_version, capabilities}`. `capabilities` is an object of flags, e.g. `{"commands":true,…,"websocket":false}`, because obs-websocket can't carry arrays of strings. If this call returns false, the plugin is absent and the script falls back |
 | `luabridge_register` | `string owner`, `string json` | `ok`, `error` | Declares the display name, commands, and dock controls (B7). Calling it again replaces the previous registration |
 | `luabridge_unregister` | `string owner` | `ok`, `error` | Removes everything for this owner. Scripts call it from `script_unload` |
-| `luabridge_set_state` | `string owner`, `string json` | `ok`, `error` | Merges key/values into the owner's state. Updates the dock and emits the websocket `StateChanged` event |
-| `luabridge_emit` | `string owner`, `string event`, `string json` | `ok`, `error` | Sends a custom event to websocket clients and other scripts |
-| `luabridge_heartbeat` | `string owner` | `ok` | Optional liveness ping (B9) |
+| `luabridge_set_state` | `string owner`, `string json` | `ok`, `error` | Merges key/values into the owner's state. Values are string, number or boolean; `null` deletes a key. Updates the dock and emits the websocket `StateChanged` event |
+| `luabridge_emit` | `string owner`, `string event`, `string json` | `ok`, `error` | Sends a custom event to websocket clients and other scripts. The data can't contain `null` or arrays of non-objects, which obs-websocket would silently drop; such calls are rejected with an error |
+| `luabridge_heartbeat` | `string owner` | `ok`, `error` | Optional liveness ping (B9) |
+| `luabridge_run_command` | `string owner`, `string command`, `string json` | `ok`, `error` | Invokes another owner's command; the target receives `luabridge_command` with `origin = "script"` |
 
 Declaration example (C++):
 
@@ -191,17 +194,19 @@ v1.0 control types: `label` (bound to a state key), `button`, `row`, `number`, `
 
 Vendor name: **`LuaBridge`**. Register it in `obs_module_post_load`, because obs-websocket must already be loaded. If obs-websocket is unavailable, log a message and continue without it.
 
+Every response is an object with `"ok": true|false`. A failed response adds `"error"`, using the same strings as the script API. This is necessary because obs-websocket reports every vendor request as successful. Responses can't be bare arrays (they travel as `obs_data`), so lists are wrapped in an object.
+
 | Request | Request data | Response |
 |---|---|---|
-| `GetInfo` | — | Same as `luabridge_get_info` |
-| `ListOwners` | — | `[{owner, display_name}]` |
-| `ListCommands` | `{owner}` | Command list for that owner |
-| `RunCommand` | `{owner, command, data}` | `{accepted: true}`. This is fire-and-forget: the script reports results through state or events |
-| `GetState` | `{owner}` | Current state object |
+| `GetInfo` | — | `{ok, api_version, plugin_version, obs_version, capabilities}`. Same fields as `luabridge_get_info` |
+| `ListOwners` | — | `{ok, owners: [{owner, display_name, stale}]}` |
+| `ListCommands` | `{owner}` | `{ok, owner, commands: [{id, label, description, confirm, args}]}` |
+| `RunCommand` | `{owner, command, data}` | `{ok, accepted: true}`. This is fire-and-forget: the script reports results through state or events |
+| `GetState` | `{owner}` | `{ok, owner, state}` |
 
 | Event | Data |
 |---|---|
-| `StateChanged` | `{owner, changes}` |
+| `StateChanged` | `{owner, changes, removed?}`. `changes` holds new and updated values. `removed` (`{key: true}`) lists deleted keys, because obs-websocket can't carry `null` |
 | `CustomEvent` | `{owner, event, data}` |
 
 Security note: obs-websocket's own authentication protects these requests. The bridge exposes only commands that scripts explicitly register, and all input is validated against B4.
@@ -336,6 +341,7 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - Stress test: 10 owners, 1,000 commands per minute from websocket, for 1 hour. Watch memory in Task Manager.
 - Clean shutdown: exit OBS while commands are in flight. No crash and no "signal not found" warnings.
 - Test with Studio Mode on and off, with scene collection switches, and with multiple duplicated script instances.
+- Rate limiting / flood protection for websocket `RunCommand`.
 - Reduce the `[lua-bridge] registered owner '…'` / `unregistered owner '…'` log lines (`src/procs.cpp`) from info to debug level. They're useful during development, but users with many scripts would see them on every start and exit.
 
 ### M6 — Packaging and CI (1–2 days)

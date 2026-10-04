@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "procs.hpp"
+#include "state-events.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -31,7 +32,10 @@ namespace {
 constexpr long long api_version = 1;
 
 std::atomic<bool> procs_enabled{false};
-Emitter *emitter = nullptr; // set once by register_procs, before any procedure can run
+// Set once by register_procs, before any procedure can run
+Emitter *emitter = nullptr;
+EventSink *events = nullptr;
+std::atomic<bool> websocket_available{false};
 
 std::string_view arg(calldata_t *cd, const char *name)
 {
@@ -87,9 +91,7 @@ void proc_unregister(void *, calldata_t *cd)
 void proc_set_state(void *, calldata_t *cd)
 {
 	auto owner = arg(cd, "owner");
-	std::string changes;
-	Result r = registry().set_state(owner, arg(cd, "json"), &changes);
-	// changes feeds the websocket StateChanged event (M2) and the dock (M3)
+	Result r = set_state_and_notify(registry(), owner, arg(cd, "json"), *events);
 	finish(cd, "luabridge_set_state", owner, r);
 }
 
@@ -99,8 +101,11 @@ void proc_emit(void *, calldata_t *cd)
 	auto event = arg(cd, "event");
 	auto json = arg(cd, "json");
 	Result r = registry().check_emit(owner, event, json);
-	if (r.ok)
-		emitter->event(std::string(owner), std::string(event), json_or_empty_object(json));
+	if (r.ok) {
+		std::string data = json_or_empty_object(json);
+		emitter->event(std::string(owner), std::string(event), data);
+		events->custom_event(std::string(owner), std::string(event), data);
+	}
 	finish(cd, "luabridge_emit", owner, r);
 }
 
@@ -115,9 +120,10 @@ void proc_run_command(void *, calldata_t *cd)
 	auto owner = arg(cd, "owner");
 	auto command = arg(cd, "command");
 	auto json = arg(cd, "json");
-	Result r = registry().check_command(owner, command, json);
+	std::string args;
+	Result r = registry().check_command(owner, command, json, &args);
 	if (r.ok)
-		emitter->command(std::string(owner), std::string(command), json_or_empty_object(json), "script");
+		emitter->command(std::string(owner), std::string(command), args, "script");
 	finish(cd, "luabridge_run_command", owner, r);
 }
 
@@ -159,7 +165,14 @@ std::string info_json()
 		{"api_version", api_version},
 		{"plugin_version", PLUGIN_VERSION},
 		{"obs_version", obs_get_version_string()},
-		{"capabilities", {"commands", "state", "events", "heartbeat", "run_command"}},
+		// An object of flags, not an array: obs_data (websocket) drops arrays of strings
+		{"capabilities",
+		 {{"commands", true},
+		  {"state", true},
+		  {"events", true},
+		  {"heartbeat", true},
+		  {"run_command", true},
+		  {"websocket", websocket_available.load()}}},
 	};
 	return info.dump();
 }
@@ -174,9 +187,15 @@ void disable_procs()
 	procs_enabled = false;
 }
 
-void register_procs(Emitter &signal_emitter)
+void set_websocket_available(bool available)
+{
+	websocket_available = available;
+}
+
+void register_procs(Emitter &signal_emitter, EventSink &event_sink)
 {
 	emitter = &signal_emitter;
+	events = &event_sink;
 	proc_handler_t *ph = obs_get_proc_handler();
 	proc_handler_add(ph, "void luabridge_get_info(out bool ok, out string error, out string json)",
 			 safe<proc_get_info>, nullptr);

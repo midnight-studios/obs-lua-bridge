@@ -85,7 +85,11 @@ local function run_sync_tests()
 	local ok, err, info = call("luabridge_get_info")
 	check("get_info returns ok", ok, err)
 	check("get_info reports api_version 1", ok and info:find('"api_version":1', 1, true) ~= nil, info)
-	check("get_info lists run_command", ok and info:find('"run_command"', 1, true) ~= nil, info)
+	check("get_info has capabilities.run_command = true", ok and info:find('"run_command":true', 1, true) ~= nil, info)
+	check("get_info reports capabilities.websocket as true or false", ok
+		and (info:find('"websocket":true', 1, true) ~= nil or info:find('"websocket":false', 1, true) ~= nil), info)
+	check("get_info capabilities is an object of flags, not an array", ok
+		and info:find('"capabilities":{', 1, true) ~= nil and info:find('"capabilities":[', 1, true) == nil, info)
 
 	-- Happy path
 	expect_ok("register", "luabridge_register", { owner = OWNER, json = REGISTRATION })
@@ -111,6 +115,11 @@ local function run_sync_tests()
 		{ owner = OWNER, command = "add", json = '{"seconds":1.5}' }, "must be int")
 	expect_fail("rejects unregistered owner", "luabridge_run_command",
 		{ owner = "nobody", command = "ping", json = "{}" }, "owner not registered")
+	expect_fail("rejects null in event data", "luabridge_emit",
+		{ owner = OWNER, event = "harness.test", json = '{"a":null}' }, "json cannot contain null or arrays of non-objects")
+	expect_fail("rejects arrays of strings in event data", "luabridge_emit",
+		{ owner = OWNER, event = "harness.test", json = '{"tags":["a","b"]}' },
+		"json cannot contain null or arrays of non-objects")
 	expect_fail("rejects invalid event name", "luabridge_emit",
 		{ owner = OWNER, event = "bad event", json = "{}" }, "invalid event name")
 	expect_fail("rejects missing owner", "luabridge_register", { json = REGISTRATION }, "missing owner")

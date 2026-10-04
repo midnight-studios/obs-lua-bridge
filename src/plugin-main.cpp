@@ -22,6 +22,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "procs.hpp"
 #include "signals.hpp"
+#include "websocket-vendor.hpp"
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE(PLUGIN_NAME, "en-US")
@@ -51,6 +52,8 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 		// No signals to scripts during shutdown (B9). Scripts are unloaded during
 		// this event too; their luabridge_unregister calls still work.
 		luabridge::signaling::begin_shutdown();
+		// obs-websocket unloads before this plugin; stop using it now
+		luabridge::websocket::stop();
 		break;
 	default:
 		break;
@@ -64,7 +67,7 @@ bool obs_module_load(void)
 	// Declared here so the signals exist before any script connects to them
 	luabridge::signaling::declare();
 	luabridge::signaling::start();
-	luabridge::register_procs(luabridge::signaling::emitter());
+	luabridge::register_procs(luabridge::signaling::emitter(), luabridge::websocket::events());
 	luabridge::enable_procs();
 
 	obs_frontend_add_tools_menu_item(obs_module_text("LuaBridge.Menu.SendTestPing"), on_send_test_ping_clicked,
@@ -77,6 +80,8 @@ bool obs_module_load(void)
 
 void obs_module_post_load(void)
 {
+	// obs-websocket is loaded by now (vendors must register in post_load)
+	luabridge::set_websocket_available(luabridge::websocket::start(luabridge::signaling::emitter()));
 	luabridge::signaling::emitter().ready(luabridge::info_json());
 }
 

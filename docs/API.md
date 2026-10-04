@@ -28,7 +28,7 @@ All procedures are on the global proc handler and set `out bool ok` and `out str
 | `luabridge_register` | `string owner`, `string json` | — | Declare the display name, commands and dock controls. Registering again replaces the previous registration. |
 | `luabridge_unregister` | `string owner` | — | Remove everything for this owner. Call it from `script_unload`. Always succeeds for a valid owner ID; for an owner that isn't registered it is a silent no-op. |
 | `luabridge_set_state` | `string owner`, `string json` | — | Merge key/values into the owner's state. |
-| `luabridge_emit` | `string owner`, `string event`, `string json` | — | Send a custom event to other scripts (`luabridge_event`) and, from M2, to websocket clients. |
+| `luabridge_emit` | `string owner`, `string event`, `string json` | — | Send a custom event to other scripts (`luabridge_event`) and to websocket clients (`CustomEvent`). The data can't contain `null` or arrays of non-objects (see [Event data](#event-data)). |
 | `luabridge_heartbeat` | `string owner` | — | Optional liveness ping (see Heartbeat). |
 | `luabridge_run_command` | `string owner`, `string command`, `string json` | — | Invoke another owner's command. The target receives `luabridge_command` with `origin = "script"`. |
 
@@ -37,8 +37,12 @@ All procedures are on the global proc handler and set `out bool ok` and `out str
 ### `luabridge_get_info` JSON
 
 ```json
-{"api_version":1,"plugin_version":"0.1.0","obs_version":"32.2.2","capabilities":["commands","state","events","heartbeat","run_command"]}
+{"api_version":1,"plugin_version":"0.1.0","obs_version":"32.2.2","capabilities":{"commands":true,"events":true,"heartbeat":true,"run_command":true,"state":true,"websocket":true}}
 ```
+
+- `capabilities` is an object of flags. It isn't an array because the same JSON is sent over obs-websocket, which can't carry arrays of strings.
+- `websocket` is `true` only when obs-websocket is available and the `LuaBridge` vendor registered.
+- Check a flag before relying on a feature, and treat a missing flag as `false`, since future versions only add flags. Without a JSON decoder, a string search is enough: `info:find('"websocket":true', 1, true) ~= nil`. The M4 helper library adds a decoder.
 
 ## Signals
 
@@ -106,6 +110,13 @@ Every script connected to `luabridge_command` receives every command, so filter 
 
 An update is all-or-nothing: if any key is invalid or the limit would be exceeded, nothing changes. Registering again clears the owner's state.
 
+## Event data
+
+The JSON passed to `luabridge_emit` is also sent to websocket clients. obs-websocket uses `obs_data`, which silently drops `null` values and array elements that aren't objects. Rather than lose data without notice, `luabridge_emit` rejects such data with `json cannot contain null or arrays of non-objects`:
+- **Allowed:** objects, strings, numbers, booleans, empty arrays, and arrays of objects (at any depth).
+- **Rejected:** `{"a":null}`, `{"tags":["a","b"]}`, `{"n":[1,2]}`, and nested arrays.
+- **Workaround for a list of scalars:** wrap each element, e.g. `{"tags":[{"v":"a"},{"v":"b"}]}`, or use an object keyed by the values.
+
 ## Heartbeat
 
 `luabridge_heartbeat` is optional. Once an owner has sent a heartbeat, it becomes **stale** if no further heartbeat arrives within 30 s. While stale:
@@ -129,7 +140,48 @@ Registering again clears the stale status. Owners that never send a heartbeat ne
 For `emit` and `run_command`, an empty `json` counts as `{}`. `run_command` checks the JSON against the command's declared args:
 - undeclared keys are rejected;
 - `int` must be a whole number;
-- missing args are allowed.
+- missing args are allowed;
+- a `null` value counts as a missing arg. It's removed before the command is delivered, so scripts never receive `null` args. This applies to commands from scripts, the dock and websocket alike.
+
+## obs-websocket vendor API
+
+The plugin registers the obs-websocket vendor **`LuaBridge`**. Clients call its requests with obs-websocket's `CallVendorRequest` (`vendorName: "LuaBridge"`), and receive its events as `VendorEvent`, which needs the `Vendors` event subscription.
+
+Every response is an object with `"ok": true|false`. On failure it also has `"error"`, using the same strings as the script API (see [Error messages](#error-messages)). This is necessary because obs-websocket always reports vendor requests themselves as successful. A request type that doesn't exist *is* rejected by obs-websocket itself.
+
+### Requests
+
+| Request | Request data | Response on success |
+|---|---|---|
+| `GetInfo` | — | `{ok, api_version, plugin_version, obs_version, capabilities}`. Same fields as `luabridge_get_info`. |
+| `ListOwners` | — | `{ok, owners: [{owner, display_name, stale}]}`, sorted by owner |
+| `ListCommands` | `{owner}` | `{ok, owner, commands: [{id, label, description, confirm, args: {name: type}}]}`, in declaration order |
+| `GetState` | `{owner}` | `{ok, owner, state: {key: value}}` |
+| `RunCommand` | `{owner, command, data?}` | `{ok, accepted: true}` |
+
+- **Fire and forget:** `RunCommand` is validated exactly like `luabridge_run_command` (owner, command, size, declared args, stale owner). The script receives `luabridge_command` with `origin = "websocket"` asynchronously, after the response has been sent. Scripts report results through state or events.
+- **Field types:** `owner` and `command` must be strings, and `data` (optional) must be an object. Otherwise the error is `missing owner`, `owner must be a string`, `missing command`, `command must be a string` or `data must be an object`.
+- **What reaches the script:** every value valid for a declared arg (int, number, string, bool) arrives unchanged.
+  - A `null` argument counts as omitted and is removed before the script sees it. That makes behaviour the same on every obs-websocket version: 5.6 drops `null` before the plugin sees it, while 5.7 passes it through. A `null` for an undeclared name is ignored too.
+  - An array keeps its key but loses its contents, so it then fails validation (`argument '<name>' must be <type>` or `unknown argument '<name>'`).
+- **Threading:** requests are handled on obs-websocket's own threads, possibly several at once. The registry is thread-safe, and signals to scripts are still delivered on the UI thread, in order.
+- **During shutdown:** requests answer `{"ok":false,"error":"plugin unloaded"}`.
+
+### Events
+
+| Event | Data | Sent when |
+|---|---|---|
+| `StateChanged` | `{owner, changes: {key: value}, removed?: {key: true}}` | `luabridge_set_state` changed at least one key. `changes` holds new and updated values. `removed` lists deleted keys and is present only when keys were deleted. |
+| `CustomEvent` | `{owner, event, data}` | `luabridge_emit` succeeded. `data` is the emitted object. |
+
+Deleted keys can't be reported as `"key": null` because obs-websocket drops `null`, hence `removed`. Events from one script arrive in the order its calls were made. No events are sent once OBS starts shutting down.
+
+### Without obs-websocket
+
+If obs-websocket isn't installed or failed to load:
+- the plugin logs `[lua-bridge] obs-websocket not available; websocket requests and events disabled` once;
+- `capabilities.websocket` is `false`;
+- everything else works unchanged.
 
 ## Error messages
 
@@ -151,4 +203,6 @@ These are stable, so scripts may match on them:
 | `owner not registered` | The owner has no registration |
 | `owner is stale; register again` | Heartbeat timed out (see Heartbeat) |
 | `unknown command '<id>'` / `unknown argument '<name>'` / `argument '<name>' must be <type>` | `run_command` didn't match the declaration |
+| `json cannot contain null or arrays of non-objects` | `luabridge_emit` data that obs-websocket couldn't carry (see [Event data](#event-data)) |
+| `owner must be a string` / `command must be a string` / `missing command` / `data must be an object` | Websocket request fields of the wrong type |
 | `plugin unloaded` | Called during OBS shutdown, after the plugin unloaded (never returned by `luabridge_unregister`) |
