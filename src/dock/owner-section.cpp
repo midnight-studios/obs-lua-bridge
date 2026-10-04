@@ -260,9 +260,11 @@ void OwnerSection::run_button(const json &button)
 		return;
 	}
 
-	// Non-modal on purpose: a modal dialog (even window-modal) makes Qt ignore
-	// close requests to the main window, so an open confirm would block OBS
-	// from closing. One confirm per section; clicking again raises it.
+	// Non-modal on purpose: a modal dialog (even window-modal) disables the main
+	// window, and OBS then ignores close requests, so an open confirm would
+	// block OBS from closing. Shown with show(), not open(): QDialog::open()
+	// always makes the dialog window-modal. One confirm per section; clicking
+	// again raises it.
 	if (confirm_) {
 		confirm_->raise();
 		confirm_->activateWindow();
@@ -279,7 +281,9 @@ void OwnerSection::run_button(const json &button)
 			send_button(button); // reads the inputs as they are now
 	});
 	confirm_ = box;
-	box->open();
+	box->show();
+	box->raise();
+	box->activateWindow();
 }
 
 void OwnerSection::send_button(const json &button)
