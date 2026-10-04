@@ -176,6 +176,9 @@ QWidget *OwnerSection::build_control(const json &control)
 		const json &cmd = commands_[command];
 		auto *button = new QPushButton(qstr(string_field(cmd, "label")), this);
 		button->setToolTip(qstr(string_field(cmd, "description")));
+		std::string label_bind = string_field(control, "label_bind");
+		if (!label_bind.empty())
+			buttons_.emplace(label_bind, BoundButton{button, string_field(cmd, "label")});
 		connect(button, &QPushButton::clicked, this, [this, control] { run_button(control); });
 		return button;
 	}
@@ -297,6 +300,10 @@ void OwnerSection::refresh_bound(const std::string &key)
 	auto labels = labels_.equal_range(key);
 	for (auto it = labels.first; it != labels.second; ++it)
 		it->second->setText(qstr(dock_logic::format_state_value(v)));
+
+	auto buttons = buttons_.equal_range(key);
+	for (auto it = buttons.first; it != buttons.second; ++it)
+		it->second.button->setText(qstr(dock_logic::button_text(it->second.command_label, v)));
 
 	auto toggles = toggles_.equal_range(key);
 	for (auto it = toggles.first; it != toggles.second; ++it) {

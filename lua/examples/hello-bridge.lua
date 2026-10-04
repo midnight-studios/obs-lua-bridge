@@ -1,97 +1,53 @@
--- hello-bridge.lua: minimal Lua Bridge for OBS example
+-- hello-bridge.lua: the smallest Lua Bridge for OBS example
 --
--- At load, asks the plugin for its info, registers the owner "hello" with a
--- "ping" command and a small dock section (a Ping button and the time of the
--- last ping), and connects to the luabridge_command signal. Click Ping in the
--- Lua Bridge dock (Docks > Lua Bridge) and the script logs "ping received" and
--- updates the label. Without the plugin installed, the script logs that and
--- otherwise does nothing.
+-- Registers the owner "hello" with a "ping" command and a small dock section
+-- (Docks > Lua Bridge): a Ping button and the time of the last ping. Clicking
+-- Ping logs "ping received" and updates the label. Without the plugin the
+-- script logs that once and otherwise does nothing.
+--
+-- It uses the helper library lua/luabridge.lua. In your own scripts, copy
+-- luabridge.lua next to the script and load it with
+--     dofile(script_path() .. "luabridge.lua")
 
-local obs = obslua
+local bridge = dofile(script_path() .. "../luabridge.lua")
 
 local OWNER = "hello"
-local REGISTRATION = '{"display_name":"Hello Bridge",'
-	.. '"commands":[{"id":"ping","label":"Ping","description":"Send a ping to hello-bridge.lua"}],'
-	.. '"dock":[{"type":"label","bind":"last_ping"},{"type":"button","command":"ping"}]}'
-
-local connected = false
 
 local function log(msg)
-	obs.script_log(obs.LOG_INFO, msg)
-end
-
--- Calls a luabridge_* procedure with string arguments.
--- Returns ok, error, json (json is only set by luabridge_get_info).
-local function call(proc, args)
-	local cd = obs.calldata_create()
-	for name, value in pairs(args or {}) do
-		obs.calldata_set_string(cd, name, value)
-	end
-	local found = obs.proc_handler_call(obs.obs_get_proc_handler(), proc, cd)
-	local ok = found and obs.calldata_bool(cd, "ok")
-	local err = found and obs.calldata_string(cd, "error") or ("procedure " .. proc .. " not found")
-	local json = obs.calldata_string(cd, "json")
-	obs.calldata_destroy(cd)
-	return ok, err, json
-end
-
-local function on_command(cd)
-	local owner = obs.calldata_string(cd, "owner")
-	if owner ~= OWNER then
-		return
-	end
-
-	local command = obs.calldata_string(cd, "command")
-	local json = obs.calldata_string(cd, "json")
-	local origin = obs.calldata_string(cd, "origin")
-
-	if command == "ping" then
-		log(string.format("ping received (owner=%s, origin=%s, json=%s)", owner, origin, json))
-		call("luabridge_set_state", { owner = OWNER, json = '{"last_ping":"Last ping: ' .. os.date("%H:%M:%S") .. '"}' })
-	else
-		log(string.format("unknown command '%s' (origin=%s)", tostring(command), tostring(origin)))
-	end
+	obslua.script_log(obslua.LOG_INFO, msg)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: minimal example. Logs the plugin info at load and "
-		.. "\"ping received\" when you click Ping in the Lua Bridge dock (Docks > Lua Bridge)."
+	return "Lua Bridge for OBS: minimal example. Click Ping in the Lua Bridge dock (Docks > Lua Bridge)."
 end
 
 function script_load(settings)
-	local ok, err, info = call("luabridge_get_info")
-	if not ok then
-		log("Lua Bridge plugin not available (" .. tostring(err) .. "); running without it")
+	local available, why = bridge.available()
+	if not available then
+		log(tostring(why) .. "; running without it")
 		return
 	end
+	log("info: " .. bridge.json.encode(bridge.info()))
+	log("obs-websocket integration: " .. (bridge.has("websocket") and "available" or "not available"))
 
-	log("info: " .. info)
-
-	-- capabilities is an object of flags, e.g. "capabilities":{"commands":true,...,"websocket":false}.
-	-- (A plain string search is enough here; the M4 helper library adds a JSON decoder.)
-	local websocket = info:find('"websocket":true', 1, true) ~= nil
-	log("obs-websocket integration: " .. (websocket and "available" or "not available"))
-
-	-- The signal only exists when the plugin is loaded, so connect only then
-	obs.signal_handler_connect(obs.obs_get_signal_handler(), "luabridge_command", on_command)
-	connected = true
-
-	ok, err = call("luabridge_register", { owner = OWNER, json = REGISTRATION })
-	if ok then
-		log("registered as '" .. OWNER .. "'")
-		call("luabridge_set_state", { owner = OWNER, json = '{"last_ping":"Last ping: never"}' })
-	else
-		log("registration failed: " .. tostring(err))
-	end
+	bridge.register(OWNER, {
+		display_name = "Hello Bridge",
+		commands = { { id = "ping", label = "Ping", description = "Send a ping to hello-bridge.lua" } },
+		dock = {
+			{ type = "label", bind = "last_ping" },
+			{ type = "button", command = "ping" },
+		},
+	})
+	bridge.on_command(OWNER, function(command, args, origin)
+		if command == "ping" then
+			log(string.format("ping received (owner=%s, origin=%s, json=%s)", OWNER, origin, bridge.json.encode(args)))
+			bridge.set_state(OWNER, { last_ping = "Last ping: " .. os.date("%H:%M:%S") })
+		end
+	end)
+	bridge.set_state(OWNER, { last_ping = "Last ping: never" })
+	log("registered as '" .. OWNER .. "'")
 end
 
 function script_unload()
-	if connected then
-		local ok, err = call("luabridge_unregister", { owner = OWNER })
-		if not ok then
-			obs.script_log(obs.LOG_WARNING, "unregister failed: " .. tostring(err))
-		end
-		obs.signal_handler_disconnect(obs.obs_get_signal_handler(), "luabridge_command", on_command)
-		connected = false
-	end
+	bridge.shutdown()
 end

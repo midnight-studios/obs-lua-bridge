@@ -274,6 +274,8 @@ void test_dock()
 	CHECK(r.ok);
 	CHECK(has_warning(r, "must name a number or text control"));
 
+	// A fresh owner, so the only possible warnings come from the dock controls
+	CHECK_OK(f.reg.unregister_owner("d"));
 	r = f.reg.register_owner(
 		"d", with_dock(R"([{"type":"number","id":"v"},{"type":"button","command":"go","args_from":{"n":"v"}},)"
 			       R"({"type":"toggle","bind":"on","command":"flip"},{"type":"text","id":"t"}])"));
@@ -469,6 +471,43 @@ struct RecordingSink final : EventSink {
 	void owner_unregistered(const std::string &owner) override { calls.push_back("unregistered:" + owner); }
 };
 
+void test_label_bind_and_replace_warning()
+{
+	Fixture f;
+	// label_bind: a valid state key is kept, an invalid one skips the button
+	Result r =
+		f.reg.register_owner("lb", with_dock(R"([{"type":"button","command":"go","label_bind":"go_label"}])"));
+	CHECK(r.ok);
+	CHECK(r.warnings.empty());
+	nlohmann::json dock;
+	CHECK_OK(f.reg.get_dock("lb", dock));
+	CHECK(dock.dump() == R"([{"command":"go","label_bind":"go_label","type":"button"}])");
+	CHECK_OK(f.reg.unregister_owner("lb"));
+
+	r = f.reg.register_owner("lb", with_dock(R"([{"type":"button","command":"go","label_bind":"bad key"}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "dock[0]: invalid or missing label_bind; skipped"));
+	CHECK_OK(f.reg.get_dock("lb", dock));
+	CHECK(dock.dump() == "[]");
+	CHECK_OK(f.reg.unregister_owner("lb"));
+
+	// Replacing an owner that is still active warns (two scripts sharing an owner)
+	r = f.reg.register_owner("w", R"({"display_name":"W"})");
+	CHECK(r.ok && r.warnings.empty()); // fresh
+	r = f.reg.register_owner("w", R"({"display_name":"W2"})");
+	CHECK(r.ok);
+	CHECK(has_warning(r, "owner 'w' was already registered and active; its registration was replaced"));
+
+	// ...but not after unregistering (script reload) or once the owner is stale
+	CHECK_OK(f.reg.unregister_owner("w"));
+	r = f.reg.register_owner("w", R"({"display_name":"W"})");
+	CHECK(r.ok && r.warnings.empty());
+	CHECK_OK(f.reg.heartbeat("w"));
+	f.advance(31s);
+	r = f.reg.register_owner("w", R"({"display_name":"W"})");
+	CHECK(r.ok && r.warnings.empty());
+}
+
 void test_registration_events()
 {
 	Fixture f;
@@ -570,6 +609,14 @@ void test_dock_logic()
 	CHECK(format_state_value(&t) == "true");
 	CHECK(format_state_value(&n) == std::string("\xe2\x80\x94"));
 	CHECK(format_state_value(nullptr) == std::string("\xe2\x80\x94"));
+
+	// Button text with label_bind
+	json starting = "Starting\xe2\x80\xa6", empty = "", number = 3;
+	CHECK(button_text("Start", nullptr) == "Start");
+	CHECK(button_text("Start", &n) == "Start");
+	CHECK(button_text("Start", &empty) == "Start");
+	CHECK(button_text("Start", &starting) == "Starting\xe2\x80\xa6");
+	CHECK(button_text("Start", &number) == "3");
 
 	// Spin box type
 	CHECK(number_is_integer(json::parse(R"({"type":"number","id":"n","min":1,"max":3600,"default":1})")));
@@ -790,6 +837,7 @@ int main()
 	test_robustness();
 	test_event_data();
 	test_registration_events();
+	test_label_bind_and_replace_warning();
 	test_dock_logic();
 	test_state_events();
 	test_snapshots();

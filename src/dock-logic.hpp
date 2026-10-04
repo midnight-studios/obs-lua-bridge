@@ -54,6 +54,11 @@ SectionPlan plan_sections(const std::vector<ShownSection> &shown, const std::vec
 // Text for a label bound to a state value; nullptr or null means "not set"
 std::string format_state_value(const nlohmann::json *value);
 
+// Text of a button with "label_bind": the bound state value while it is set
+// (formatted like a label), otherwise the command's label. A null or empty value
+// also falls back to the label, so a button is never blank.
+std::string button_text(const std::string &command_label, const nlohmann::json *state_value);
+
 // The text shown for a state key that is not set (an em dash)
 extern const char *const missing_value;
 

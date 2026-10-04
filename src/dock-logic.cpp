@@ -69,6 +69,14 @@ std::string format_state_value(const json *value)
 	return value->dump();
 }
 
+std::string button_text(const std::string &command_label, const json *state_value)
+{
+	if (!state_value || state_value->is_null())
+		return command_label;
+	std::string text = format_state_value(state_value);
+	return text.empty() ? command_label : text;
+}
+
 namespace {
 
 bool is_whole(const json &v)

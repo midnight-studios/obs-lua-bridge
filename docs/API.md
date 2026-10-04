@@ -4,6 +4,64 @@ This is the contract between the plugin and scripts. The plugin exposes **proced
 
 Scripts must keep working without the plugin. Call `luabridge_get_info` first. If the call fails (the procedure doesn't exist), the plugin isn't installed, so skip everything else, including connecting to the `luabridge_*` signals.
 
+## The helper library: `luabridge.lua`
+
+Most scripts should use the helper rather than calling procedures directly. Copy `lua/luabridge.lua` next to your script and load it:
+
+```lua
+local bridge = dofile(script_path() .. "luabridge.lua")
+
+function script_load(settings)
+	bridge.register("myscript", {
+		display_name = "My Script",
+		commands = { { id = "go", label = "Go" } },
+		dock = { { type = "label", bind = "status" }, { type = "button", command = "go" } },
+	})
+	bridge.on_command("myscript", function(command, args, origin)
+		bridge.set_state("myscript", { status = "went (" .. origin .. ")" })
+	end)
+end
+
+function script_unload()
+	bridge.shutdown()
+end
+```
+
+Every function returns `ok, err` and never throws. **Without the plugin**, every call returns `false, "Lua Bridge plugin not available"` and does nothing, so the same script runs unchanged where the plugin isn't installed.
+
+| Function | Purpose |
+|---|---|
+| `bridge.available()` | `true` if the plugin is installed and compatible, otherwise `false, reason` |
+| `bridge.unavailable_reason()` | `nil`, or why the plugin can't be used |
+| `bridge.info()` / `bridge.has(capability)` | The decoded `luabridge_get_info` table; whether a capability flag is `true` |
+| `bridge.register(owner, registration, options)` | Registration as a Lua table. `options`: `heartbeat` (default `true`), `heartbeat_interval` (seconds, default 10), `on_heartbeat(ok, err)`. Registering clears the owner's state. |
+| `bridge.unregister(owner)` | Removes an owner |
+| `bridge.on_command(owner, fn)` | `fn(command, args, origin)` for each command; `args` is a table |
+| `bridge.on_event(fn)` | `fn(owner, event, data)` for every `luabridge_emit` |
+| `bridge.set_state(owner, values)` | Merges values; `bridge.null` deletes a key |
+| `bridge.emit(owner, event, data)` | Custom event to scripts and websocket clients |
+| `bridge.run_command(owner, command, args)` | Sends a command to any owner (`origin = "script"`) |
+| `bridge.set_heartbeat(owner, enabled)` | Turns the heartbeat on or off; turning it on sends one at once |
+| `bridge.shutdown()` | Unregisters every owner of the script, stops the heartbeat, disconnects signals. Call it from `script_unload`. |
+| `bridge.json.encode(value)` / `bridge.json.decode(text)` | Pure-Lua JSON. Returns the result, or `nil, error`. |
+| `bridge.null`, `bridge.array(t)`, `bridge.object(t)` | JSON `null`, and markers for an empty array or object (an empty table encodes as `{}`) |
+| `bridge.VERSION`, `bridge.API_VERSION` | Helper version (`"1.0.0"`), and the plugin `api_version` it needs (1) |
+
+**Automatic behaviour:**
+- **Heartbeat:** one shared timer sends a heartbeat for each owner (every 10 s by default), so an owner only goes stale if the script really stops.
+- **Re-registration:** if the plugin answers `owner not registered` or `owner is stale; register again`, for example after **Remove** in the dock, the helper registers the owner again with its original registration, republishes the state it has set, and retries the call once. It logs `[luabridge] re-registered '<owner>'`, at most once per owner every 5 s.
+- **Compatibility:** if the plugin's `api_version` is missing or older than `bridge.API_VERSION`, the helper treats the plugin as unavailable and logs one warning explaining that the plugin needs updating. Newer plugins work, because API changes within a major version are additive.
+- **Signals:** command and event handlers are connected once per script and disconnected by `shutdown()`. Errors in your handlers are caught and logged, never passed back to OBS.
+
+**JSON details:**
+- Object keys are sorted, so output is deterministic.
+- Integers are written without a decimal point; other numbers in the shortest form that reads back exactly.
+- A table with keys `1..n` is an array.
+- Decoded objects and arrays keep their shape when encoded again, and JSON `null` decodes to `bridge.null`.
+- Decoding errors report the position, e.g. `expected ':' at position 5`.
+
+Examples: `lua/examples/hello-bridge.lua` (smallest), `stopwatch-demo.lua`, `scoreboard.lua`, and `tests/lua/dock-test.lua` (every dock control).
+
 ## Calling a procedure from Lua
 
 ```lua
@@ -91,7 +149,7 @@ Every script connected to `luabridge_command` receives every command, so filter 
   - Any invalid command rejects the whole registration.
 - **`dock`:** optional, at most 256 controls in total, counting row items. The control types are:
   - `label`: needs `bind` (a state key); `style` is optional.
-  - `button`: needs `command` (a declared command); `args_from` is optional and maps declared args to `number`/`text` control IDs.
+  - `button`: needs `command` (a declared command); `args_from` is optional and maps declared args to `number`/`text` control IDs. `label_bind` is optional: a state key whose value the button shows while it's set (see [The dock](#the-dock)).
   - `toggle`: needs `bind` and `command`; it sends `{"value": true|false}`, so the command must declare an arg `value` of type `bool`.
   - `number`: needs a unique `id`; `min`, `max` and `default` are optional, with min ≤ default ≤ max. `label` (text shown next to it) is optional.
   - `text`: needs a unique `id`; `default` is optional, ≤ 256 bytes. `label` is optional.
@@ -99,6 +157,8 @@ Every script connected to `luabridge_command` receives every command, so filter 
   - `separator`.
 
   Unknown control types, and controls with invalid fields, are **skipped with a logged warning**, and the registration still succeeds. That way newer scripts degrade gracefully on older plugins. Unknown fields are ignored.
+
+**Registering an owner that is already active** (registered and not stale) replaces it and logs a warning: `owner '<id>' was already registered and active; its registration was replaced (are two scripts using the same owner?)`. The call still succeeds. A script that reloads doesn't trigger it, because it unregisters first; neither does re-registering a stale owner. It usually means two scripts use the same owner ID.
 
 ## State
 
@@ -152,7 +212,7 @@ The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one coll
 | Control | Shown as | What it does |
 |---|---|---|
 | `label` | Text bound to a state key | Shows the key's value (strings as-is, numbers in shortest form, `true`/`false`, `—` when not set) and updates as soon as the script calls `luabridge_set_state`. `style: "large"` shows it large and bold. |
-| `button` | A button with the command's `label` (tooltip: `description`) | Sends the command with `origin = "dock"`. With `confirm: true` it asks first. `args_from` fills args from `number`/`text` controls. |
+| `button` | A button with the command's `label` (tooltip: `description`) | Sends the command with `origin = "dock"`. With `confirm: true` it asks first. `args_from` fills args from `number`/`text` controls. With `label_bind: "<state key>"`, the button shows that key's value while it's set, and the command's label when it's unset, `null` or empty. Use it for e.g. Start/Pause, or "Starting…" → "Started ✓". |
 | `row` | Its items side by side | Buttons share the width. |
 | `number` | A spin box (whole numbers, or 3 decimals if `min`, `max` or `default` isn't whole) | Holds a value for buttons; sends nothing by itself. |
 | `text` | A text field | Holds a value for buttons; sends nothing by itself. |

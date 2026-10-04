@@ -91,6 +91,11 @@ private:
 
 	std::multimap<std::string, QLabel *> labels_;     // state key -> bound labels
 	std::multimap<std::string, QCheckBox *> toggles_; // state key -> bound toggles
+	struct BoundButton {
+		QPushButton *button;
+		std::string command_label; // shown while the bound key is not set
+	};
+	std::multimap<std::string, BoundButton> buttons_; // label_bind key -> buttons
 	std::map<std::string, QWidget *> inputs_;         // number/text control id -> widget
 	std::vector<QLabel *> large_labels_;              // style "large"; resized on theme change
 };
