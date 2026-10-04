@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Deploy to test OBS",
+      "type": "shell",
+      "command": "pwsh -File ${workspaceFolder}/tools/deploy-test.ps1",
+      "dependsOn": "CMake: build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Format all",
+      "type": "shell",
+      "command": "pwsh -File ${workspaceFolder}/tools/format.ps1",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run websocket tests",
+      "type": "shell",
+      "command": "py ${workspaceFolder}/tests/websocket/test_vendor.py",
+      "problemMatcher": []
+    },
+    {
+      "label": "Open latest OBS test log",
+      "type": "shell",
+      "command": "code (Get-ChildItem C:/obs-test/config/obs-studio/logs | Sort-Object LastWriteTime | Select-Object -Last 1).FullName",
+      "problemMatcher": []
+    },
+    {
+      "label": "CMake: build",
+      "type": "cmake",
+      "command": "build",
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}
