@@ -131,8 +131,8 @@ void log_failure(const char *request, const std::string &owner, const json &resu
 	std::string error = result.value("error", std::string());
 	LogLimiter::Verdict v = request_log().check(std::string(request) + "|" + owner + "|" + error);
 	if (v.log)
-		obs_log(LOG_WARNING, "websocket %s(%.*s): %s%s", request, (int)std::min<size_t>(owner.size(), 64),
-			owner.c_str(), error.c_str(), LogLimiter::suffix(v).c_str());
+		obs_log(LOG_WARNING, "websocket %s(%s): %s%s", request, printable(owner).c_str(), error.c_str(),
+			LogLimiter::suffix(v).c_str());
 }
 
 // Rate-limited RunCommand: the first rejection per owner is logged, then at most
@@ -146,8 +146,8 @@ void log_rate_limited(const std::string &owner)
 	std::string summary =
 		v.suppressed ? "; " + std::to_string(v.suppressed) + " more requests were rate limited in the last 10 s"
 			     : std::string();
-	obs_log(LOG_WARNING, "websocket RunCommand(%.*s): rate limited (%g/s, burst %g)%s",
-		(int)std::min<size_t>(owner.size(), 64), owner.c_str(), c.owner_rate, c.owner_burst, summary.c_str());
+	obs_log(LOG_WARNING, "websocket RunCommand(%s): rate limited (%g/s, burst %g)%s", printable(owner).c_str(),
+		c.owner_rate, c.owner_burst, summary.c_str());
 }
 
 json get_info(obs_data_t *)

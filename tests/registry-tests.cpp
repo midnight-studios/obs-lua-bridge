@@ -473,6 +473,16 @@ struct RecordingSink final : EventSink {
 	void owner_unregistered(const std::string &owner) override { calls.push_back("unregistered:" + owner); }
 };
 
+void test_printable()
+{
+	CHECK(printable("stopwatch.2") == "stopwatch.2");
+	CHECK(printable("\xe2\x80\xaeRTL\xe2\x80\xac") == "???RTL???"); // bidi override
+	CHECK(printable("a\nb\tc\x01") == "a?b?c?");
+	CHECK(printable(std::string("x\0y", 3)) == "x?y");
+	CHECK(printable(std::string(70, 'z')) == std::string(64, 'z') + "...");
+	CHECK(printable("") == "");
+}
+
 void test_rate_limiter()
 {
 	auto now = std::make_shared<Clock::time_point>(Clock::time_point{} + 1h);
@@ -933,6 +943,7 @@ int main()
 	test_event_data();
 	test_registration_events();
 	test_label_bind_and_replace_warning();
+	test_printable();
 	test_rate_limiter();
 	test_log_limiter();
 	test_dock_logic();

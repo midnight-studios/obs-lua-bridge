@@ -51,15 +51,7 @@ template<typename Pred> bool matches(std::string_view s, Pred allowed)
 std::string quote_id(std::string_view s)
 {
 	// Error messages echo ids back; keep them short and printable
-	std::string out = "'";
-	for (char c : s.substr(0, 64)) {
-		unsigned char u = static_cast<unsigned char>(c);
-		out += (u >= 0x20 && u < 0x7f) ? c : '?';
-	}
-	if (s.size() > 64)
-		out += "...";
-	out += "'";
-	return out;
+	return "'" + printable(s) + "'";
 }
 
 std::string dump(const json &j)
@@ -571,6 +563,18 @@ Result check_owner_arg(std::string_view owner)
 }
 
 } // namespace
+
+std::string printable(std::string_view text)
+{
+	std::string out;
+	for (char c : text.substr(0, 64)) {
+		unsigned char u = static_cast<unsigned char>(c);
+		out += (u >= 0x20 && u < 0x7f) ? c : '?';
+	}
+	if (text.size() > 64)
+		out += "...";
+	return out;
+}
 
 bool is_valid_owner_id(std::string_view id)
 {
