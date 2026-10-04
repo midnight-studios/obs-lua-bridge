@@ -1,59 +1,59 @@
-# OBS Plugin Template
+# Lua Bridge for OBS
 
-## Introduction
+An OBS Studio plugin that gives Lua scripts what OBS's scripting API lacks:
+- **a dock UI:** buttons, labels, inputs and toggles for your script in **Docks → Lua Bridge**;
+- **commands:** from that dock, from other scripts, and from **obs-websocket** clients such as Stream Deck or
+  custom tools;
+- **shared state and custom events** that websocket clients can read and receive.
 
-The plugin template is meant to be used as a starting point for OBS Studio plugin development. It includes:
+Scripts keep working when the plugin isn't installed: the helper library falls back silently.
 
-* Boilerplate plugin source code
-* A CMake project file
-* GitHub Actions workflows and repository actions
+```lua
+local bridge = dofile(script_path() .. "luabridge.lua")
 
-## Supported Build Environments
+function script_load(settings)
+    bridge.register("hello", {
+        display_name = "Hello Bridge",
+        commands = { { id = "ping", label = "Ping" } },
+        dock = { { type = "label", bind = "last_ping" }, { type = "button", command = "ping" } },
+    })
+    bridge.on_command("hello", function(command)
+        bridge.set_state("hello", { last_ping = "Last ping: " .. os.date("%H:%M:%S") })
+    end)
+end
 
-| Platform  | Tool   |
-|-----------|--------|
-| Windows   | Visual Studio 17 2022 |
-| macOS     | XCode 16.0 |
-| Windows, macOS  | CMake 3.30.5 |
-| Ubuntu 24.04 | CMake 3.28.3 |
-| Ubuntu 24.04 | `ninja-build` |
-| Ubuntu 24.04 | `pkg-config`
-| Ubuntu 24.04 | `build-essential` |
+function script_unload()
+    bridge.shutdown()
+end
+```
 
-## Quick Start
-
-An absolute bare-bones [Quick Start Guide](https://github.com/obsproject/obs-plugintemplate/wiki/Quick-Start-Guide) is available in the wiki.
+## Install
+Download the package for Windows, macOS or Linux from
+[Releases](https://github.com/midnight-studios/obs-lua-bridge/releases) and follow
+[docs/INSTALL.md](docs/INSTALL.md). It requires OBS Studio 31.1 or newer. The macOS build
+is currently unsigned; the install guide shows the one-time confirmation step.
 
 ## Documentation
+- [docs/API.md](docs/API.md): the script API (procedures, signals, dock controls), the helper library and
+  the obs-websocket vendor requests.
+- [lua/](lua/): the helper `luabridge.lua` and example scripts (`hello-bridge`, `scoreboard`, `stopwatch-demo`).
+- [docs/integrations/stopwatch.md](docs/integrations/stopwatch.md): integrating an existing script.
+- [docs/TESTING.md](docs/TESTING.md): the test suites; [docs/RELEASING.md](docs/RELEASING.md): how releases are
+  made; [CHANGELOG.md](CHANGELOG.md).
 
-All documentation can be found in the [Plugin Template Wiki](https://github.com/obsproject/obs-plugintemplate/wiki).
+## Building
+The plugin is built with the [OBS plugin template](https://github.com/obsproject/obs-plugintemplate) build
+system. On Windows:
+```
+cmake --preset windows-x64
+cmake --build --preset windows-x64
+```
+The presets `macos` and `ubuntu-x86_64` work the same way. See the template's
+[wiki](https://github.com/obsproject/obs-plugintemplate/wiki) for the build requirements.
 
-Suggested reading to get up and running:
+## License
+- **The plugin** is licensed under the [GNU General Public License v2.0 or later](LICENSE).
+- **The Lua helper and example scripts in [lua/](lua/)** are licensed under the [MIT License](lua/LICENSE), so
+  you can copy `luabridge.lua` into scripts under any license, open or closed.
 
-* [Getting started](https://github.com/obsproject/obs-plugintemplate/wiki/Getting-Started)
-* [Build system requirements](https://github.com/obsproject/obs-plugintemplate/wiki/Build-System-Requirements)
-* [Build system options](https://github.com/obsproject/obs-plugintemplate/wiki/CMake-Build-System-Options)
-
-## GitHub Actions & CI
-
-Default GitHub Actions workflows are available for the following repository actions:
-
-* `push`: Run for commits or tags pushed to `master` or `main` branches.
-* `pr-pull`: Run when a Pull Request has been pushed or synchronized.
-* `dispatch`: Run when triggered by the workflow dispatch in GitHub's user interface.
-* `build-project`: Builds the actual project and is triggered by other workflows.
-* `check-format`: Checks CMake and plugin source code formatting and is triggered by other workflows.
-
-The workflows make use of GitHub repository actions (contained in `.github/actions`) and build scripts (contained in `.github/scripts`) which are not needed for local development, but might need to be adjusted if additional/different steps are required to build the plugin.
-
-### Retrieving build artifacts
-
-Successful builds on GitHub Actions will produce build artifacts that can be downloaded for testing. These artifacts are commonly simple archives and will not contain package installers or installation programs.
-
-### Building a Release
-
-To create a release, an appropriately named tag needs to be pushed to the `main`/`master` branch using semantic versioning (e.g., `12.3.4`, `23.4.5-beta2`). A draft release will be created on the associated repository with generated installer packages or installation programs attached as release artifacts.
-
-## Signing and Notarizing on macOS
-
-Basic concepts of codesigning and notarization on macOS are explained in the correspodning [Wiki article](https://github.com/obsproject/obs-plugintemplate/wiki/Codesigning-On-macOS) which has a specific section for the [GitHub Actions setup](https://github.com/obsproject/obs-plugintemplate/wiki/Codesigning-On-macOS#setting-up-code-signing-for-github-actions).
+Third-party components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

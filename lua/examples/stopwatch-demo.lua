@@ -1,5 +1,8 @@
 -- stopwatch-demo.lua: a small stopwatch controlled from the Lua Bridge dock
 --
+-- SPDX-License-Identifier: MIT
+-- Copyright (c) 2026 Midnight Studios. See lua/LICENSE (MIT); the plugin itself is GPL-2.0-or-later.
+--
 -- DEMO ONLY. This is not the StopWatch script from midnight-studios/obs-lua.
 -- It implements the same Lua Bridge contract (owner "stopwatch"; see
 -- docs/integrations/stopwatch.md), so dock layouts and websocket clients built

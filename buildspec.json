@@ -38,7 +38,7 @@
     },
     "name": "obs-lua-bridge",
     "displayName": "Lua Bridge for OBS",
-    "version": "0.1.0",
+    "version": "0.9.0",
     "author": "Midnight Studios",
     "website": "https://github.com/midnight-studios/obs-lua-bridge",
     "email": "25770335+midnight-studios@users.noreply.github.com"

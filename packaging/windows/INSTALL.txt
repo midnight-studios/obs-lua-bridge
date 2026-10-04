@@ -1,0 +1,33 @@
+Lua Bridge for OBS: installing on Windows
+=========================================
+
+Requires OBS Studio 31.1 or newer (64-bit).
+
+Install
+-------
+1. Close OBS.
+2. Copy the "obs-lua-bridge" folder from this zip into
+       C:\ProgramData\obs-studio\plugins\
+   so that you end up with
+       C:\ProgramData\obs-studio\plugins\obs-lua-bridge\bin\64bit\obs-lua-bridge.dll
+   (Create the "plugins" folder if it doesn't exist. Windows may ask for
+   administrator permission.)
+3. Start OBS. Docks > Lua Bridge is now available.
+
+Try the examples
+----------------
+In OBS, open Tools > Scripts, click +, and pick a script from
+    C:\ProgramData\obs-studio\plugins\obs-lua-bridge\data\lua\examples\
+Its controls appear in Docks > Lua Bridge. To use the helper in your own
+scripts, copy luabridge.lua from ...\data\lua\ next to your script; see the
+README.txt in that folder.
+
+Uninstall
+---------
+Close OBS and delete
+    C:\ProgramData\obs-studio\plugins\obs-lua-bridge
+Scripts that use the helper keep working without the plugin.
+
+More: https://github.com/midnight-studios/obs-lua-bridge
+License: GPL-2.0-or-later (see obs-lua-bridge\LICENSE); the Lua helper and
+examples are MIT (see obs-lua-bridge\data\lua\LICENSE).

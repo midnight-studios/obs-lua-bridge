@@ -1,5 +1,8 @@
 -- scoreboard.lua: a minimal score board with Lua Bridge for OBS
 --
+-- SPDX-License-Identifier: MIT
+-- Copyright (c) 2026 Midnight Studios. See lua/LICENSE (MIT); the plugin itself is GPL-2.0-or-later.
+--
 -- With the plugin: a "Score Board" section in Docks > Lua Bridge (the score and
 -- +/- buttons for each team, Reset). Every change is published as state (the
 -- dock label updates) and emitted as the event "score.changed" {home, away},
