@@ -14,6 +14,8 @@ local fake = {
 	logs = {},               -- { level = ..., msg = ... }
 	connections = {},        -- signal name -> connected function
 	timers = {},             -- function -> interval ms
+	buttons = {},            -- property name -> callback of the last script_properties()
+	now_ns = 0,              -- returned by os_gettime_ns
 }
 
 local function copy(t)
@@ -117,7 +119,57 @@ obslua = {
 	script_log = function(level, msg)
 		fake.logs[#fake.logs + 1] = { level = level, msg = msg }
 	end,
+
+	-- What the example scripts use besides the plugin (settings, properties,
+	-- sources); a scene without sources
+	LOG_DEBUG = 400,
+	OBS_TEXT_DEFAULT = 0,
+	OBS_COMBO_TYPE_EDITABLE = 1,
+	OBS_COMBO_FORMAT_STRING = 3,
+	os_gettime_ns = function()
+		return fake.now_ns
+	end,
+	obs_data_create = function()
+		return {}
+	end,
+	obs_data_release = function() end,
+	obs_data_set_string = function(data, key, value)
+		data[key] = value
+	end,
+	obs_data_get_string = function(data, key)
+		return data[key] or ""
+	end,
+	obs_get_source_by_name = function()
+		return nil
+	end,
+	obs_enum_sources = function()
+		return {}
+	end,
+	source_list_release = function() end,
+	obs_properties_create = function()
+		fake.buttons = {}
+		return {}
+	end,
+	obs_properties_add_text = function() end,
+	obs_properties_add_list = function()
+		return {}
+	end,
+	obs_property_list_add_string = function() end,
+	obs_properties_add_button = function(_, name, _, callback)
+		fake.buttons[name] = callback
+	end,
 }
+
+-- Log lines at warning level or worse: OBS opens its Script Log window for these
+function fake.warnings()
+	local found = {}
+	for _, l in ipairs(fake.logs) do
+		if l.level <= obslua.LOG_WARNING then
+			found[#found + 1] = l
+		end
+	end
+	return found
+end
 
 -- Calls made to a procedure (in order)
 function fake.calls_to(name)

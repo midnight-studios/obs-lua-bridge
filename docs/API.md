@@ -194,6 +194,15 @@ Lua Bridge keeps the OBS log quiet in normal use:
 - **Registration warnings** (a dock control skipped, an owner replaced while active) are logged for every registration.
 - **The helper library** deduplicates its own handler-failure warnings the same way, per handler.
 
+**Script log levels.** OBS opens its Script Log window whenever a script logs at warning level or worse (`script_log` with `LOG_WARNING` or `LOG_ERROR`); the plugin's own lines above don't, because they don't come from a script. So scripts should warn only about problems the user or script author must act on. The helper and the examples follow this:
+
+| Situation | Helper / examples log |
+|---|---|
+| Plugin not installed | nothing (`hello-bridge.lua` logs one info line) |
+| Owner re-registered after the plugin forgot it | info |
+| Plugin too old, or its `luabridge_get_info` fails | one warning: update the Lua Bridge plugin |
+| A script's own command, event or heartbeat handler throws | warning (a bug in that script), deduplicated |
+
 ## Duplicated scripts and instance IDs
 
 OBS can't load the same script file twice, so running two copies of a script means two files. Each copy needs its own **owner**: use the base owner plus a suffix, e.g. `stopwatch` and `stopwatch.2`. The examples `stopwatch-demo.lua` and `scoreboard.lua` have an **Instance ID** script property for this. When it's empty they use the base owner; `2` gives `stopwatch.2`. Changing it registers the script under the new owner. Two scripts using the same owner replace each other's registration, which the plugin logs as a warning.
