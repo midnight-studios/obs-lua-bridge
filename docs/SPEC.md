@@ -162,7 +162,12 @@ Declared on `obs_get_signal_handler()` in `obs_module_load`:
 | `luabridge_event` | `string owner, string event, string json` | Any owner calls `luabridge_emit`. This lets scripts listen to each other |
 | `luabridge_ready` | `string json` (info) | The plugin finished loading, and again on `OBS_FRONTEND_EVENT_FINISHED_LOADING` |
 
-**Threading rule:** All signals to scripts are emitted on the **UI thread**. Websocket requests arrive on obs-websocket's thread, so the plugin marshals them with `obs_queue_task(OBS_TASK_UI, …)` before emitting. This keeps script callbacks safe and their order predictable.
+**Threading rule:** All signals to scripts are delivered **asynchronously** on the **UI thread**, after the call that caused them returns, in **FIFO order**.
+- Procedures can be called from any thread: the UI thread, the graphics thread (Lua timers) or obs-websocket's worker threads. Every emit is therefore posted with `QMetaObject::invokeMethod(…, Qt::QueuedConnection)` to a `QObject` the plugin owns.
+- `obs_queue_task(OBS_TASK_UI, …)` is **not** used: when called on the UI thread it runs the task immediately, which would re-enter the calling script and break ordering.
+- Nothing is emitted once shutdown begins. Deleting the plugin's `QObject` at unload discards emits that are still queued.
+
+This keeps script callbacks safe and their order predictable.
 
 ### B7. Registration JSON (v1)
 
