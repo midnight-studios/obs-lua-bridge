@@ -43,8 +43,12 @@ add_executable(registry-tests registry-tests.cpp)
 target_link_libraries(registry-tests PRIVATE obs-lua-bridge-core)
 
 if(MSVC)
-  target_compile_options(obs-lua-bridge-core PRIVATE /W4 /utf-8)
-  target_compile_options(registry-tests PRIVATE /W4 /utf-8)
+  # The plugin's MSVC options (cmake/windows/compilerconfig.cmake). The
+  # conforming preprocessor is required: the tests pass raw string literals as
+  # macro arguments, which the traditional preprocessor in VS 2022 mishandles.
+  set(_msvc_options /W4 /utf-8 /Zc:__cplusplus /Zc:preprocessor)
+  target_compile_options(obs-lua-bridge-core PRIVATE ${_msvc_options})
+  target_compile_options(registry-tests PRIVATE ${_msvc_options})
 else()
   target_compile_options(obs-lua-bridge-core PRIVATE -Wall -Wextra)
   target_compile_options(registry-tests PRIVATE -Wall -Wextra)

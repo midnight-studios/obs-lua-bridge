@@ -28,11 +28,16 @@ jobs:
           : Run C++ Unit Tests 🧪
           ctest --test-dir build_tests -C Release --output-on-failure
 
+      # Not on macOS: lupa's Apple Silicon wheel has no LuaJIT 2.1 runtime, and
+      # the runner refuses to fall back to another Lua. The Lua code is pure Lua
+      # on the same LuaJIT, so Ubuntu and Windows cover it.
       - uses: actions/setup-python@v5
+        if: runner.os != 'macOS'
         with:
           python-version: '3.12'
 
       - name: Run Lua Unit Tests (LuaJIT 2.1) 🌙
+        if: runner.os != 'macOS'
         run: |
           : Run Lua Unit Tests 🌙
           python -m pip install --quiet lupa
