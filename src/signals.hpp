@@ -18,21 +18,26 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
-// Signals to scripts (spec B6). Emission is always queued to the UI thread with
-// obs_queue_task, so scripts see signals in call order and never re-entrantly.
+// Qt-based Emitter: every signal is posted with Qt::QueuedConnection to a
+// QObject owned by the plugin, so it is delivered on the UI thread after the
+// calling procedure returns, in FIFO order, whatever thread the call came from.
+// (obs_queue_task(OBS_TASK_UI) is not used: it runs inline on the UI thread.)
 
-#include <string>
+#include "emitter.hpp"
 
-namespace luabridge::signals {
+namespace luabridge::signaling {
 
 // Declares all luabridge_* signals on the global signal handler (obs_module_load)
 void declare();
 
-void emit_command(std::string owner, std::string command, std::string json, std::string origin);
-void emit_event(std::string owner, std::string event, std::string json);
-void emit_ready(std::string json);
+// Creates the plugin's QObject. Call on the UI thread in obs_module_load.
+void start();
+// Sets the shutting-down flag: nothing new is queued and queued emits are dropped
+void begin_shutdown();
+// Shuts down and deletes the QObject, which discards emits still in Qt's queue
+void stop();
 
-// Once set, queued signals are dropped and nothing new is queued (OBS exit / unload)
-void set_shutting_down(bool value);
+// Always valid; does nothing before start() and after begin_shutdown()
+Emitter &emitter();
 
-} // namespace luabridge::signals
+} // namespace luabridge::signaling

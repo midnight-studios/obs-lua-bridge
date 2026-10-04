@@ -18,28 +18,25 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
-// Procedures on the global proc handler (spec B5 plus luabridge_run_command).
+// Delivery of signals to scripts (spec B6), kept free of Qt and libobs so code
+// that only needs to send signals does not depend on how they are delivered.
+// Implementations deliver asynchronously on the UI thread, after the calling
+// procedure returns, in FIFO order, and drop everything once shutdown begins.
 
 #include <string>
 
-#include "emitter.hpp"
-#include "registry.hpp"
-
 namespace luabridge {
 
-// The process-wide registry. It is never destroyed while OBS runs, because scripts
-// may still call procedures after this module's obs_module_unload.
-Registry &registry();
+class Emitter {
+public:
+	virtual ~Emitter() = default;
 
-// JSON returned by luabridge_get_info and sent with luabridge_ready
-std::string info_json();
-
-// Registers all procedures. Signals they cause are sent through emitter.
-void register_procs(Emitter &emitter);
-
-// After disable_procs() (obs_module_unload) every procedure returns at once with
-// ok=false, error="plugin unloaded", without logging or touching the registry.
-void enable_procs();
-void disable_procs();
+	// luabridge_command(owner, command, json, origin)
+	virtual void command(std::string owner, std::string command, std::string json, std::string origin) = 0;
+	// luabridge_event(owner, event, json)
+	virtual void event(std::string owner, std::string event, std::string json) = 0;
+	// luabridge_ready(json)
+	virtual void ready(std::string json) = 0;
+};
 
 } // namespace luabridge

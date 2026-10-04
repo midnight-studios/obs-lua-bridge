@@ -51,9 +51,10 @@ All signals are on the global signal handler and declared when the plugin loads,
 | `luabridge_ready` | `string json` | After the plugin finishes loading, and again when the OBS frontend finishes loading. `json` is the same as `luabridge_get_info`. |
 
 **Threading and order:**
-- Signals are always emitted on the OBS UI thread.
-- They're queued, never sent from inside the procedure call that caused them. A script that calls `luabridge_run_command` or `luabridge_emit` gets `ok` back first; the signal arrives afterwards, in call order.
-- No signals are sent while OBS is shutting down.
+- Signals are always delivered **asynchronously** on the OBS UI thread, **after the call that caused them returns**, in **FIFO order**. This holds whichever thread the call came from: `script_load` and dock callbacks (UI thread), `timer_add` callbacks (graphics thread), or obs-websocket requests.
+- A script that calls `luabridge_run_command` or `luabridge_emit` gets `ok` back first. Its own handler never runs inside the call.
+- No signals are sent once OBS starts shutting down (`OBS_FRONTEND_EVENT_EXIT`). Signals still queued at that point are dropped.
+- After the plugin has been unloaded, every procedure returns `ok = false` with `error = "plugin unloaded"`, without logging.
 
 Every script connected to `luabridge_command` receives every command, so filter on `owner`.
 
@@ -150,3 +151,4 @@ These are stable, so scripts may match on them:
 | `owner not registered` | The owner has no registration |
 | `owner is stale; register again` | Heartbeat timed out (see Heartbeat) |
 | `unknown command '<id>'` / `unknown argument '<name>'` / `argument '<name>' must be <type>` | `run_command` didn't match the declaration |
+| `plugin unloaded` | Called during OBS shutdown, after the plugin unloaded |

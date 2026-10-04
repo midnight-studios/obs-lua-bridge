@@ -20,40 +20,95 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include <atomic>
 #include <functional>
-#include <memory>
+#include <mutex>
+
+#include <QCoreApplication>
+#include <QMetaObject>
+#include <QObject>
+#include <QThread>
 
 #include <obs.h>
 #include <plugin-support.h>
 
-namespace luabridge::signals {
+namespace luabridge::signaling {
 
 namespace {
 
-std::atomic<bool> shutting_down{false};
+std::atomic<bool> shutting_down{true}; // until start()
 
-void run_task(void *param)
-{
-	std::unique_ptr<std::function<void()>> fn(static_cast<std::function<void()> *>(param));
-	if (shutting_down)
-		return;
-	try {
-		(*fn)();
-	} catch (...) {
-		obs_log(LOG_ERROR, "unexpected exception while emitting a signal");
-	}
-}
+// Queued emits are posted to this object; deleting it discards those still pending
+std::mutex context_mutex;
+QObject *context = nullptr;
 
-void queue(std::function<void()> fn)
+void post(std::function<void()> fn)
 {
 	if (shutting_down)
 		return;
-	obs_queue_task(OBS_TASK_UI, run_task, new std::function<void()>(std::move(fn)), false);
+
+	// The lock keeps stop() from deleting the context while we post to it
+	std::lock_guard lock(context_mutex);
+	if (!context)
+		return;
+	QMetaObject::invokeMethod(
+		context,
+		[fn = std::move(fn)] {
+			if (shutting_down)
+				return;
+			try {
+				fn();
+			} catch (...) {
+				obs_log(LOG_ERROR, "unexpected exception while emitting a signal");
+			}
+		},
+		Qt::QueuedConnection);
 }
 
 void signal(const char *name, calldata_t *cd)
 {
 	signal_handler_signal(obs_get_signal_handler(), name, cd);
 }
+
+class QtEmitter final : public Emitter {
+public:
+	void command(std::string owner, std::string command, std::string json, std::string origin) override
+	{
+		post([owner = std::move(owner), command = std::move(command), json = std::move(json),
+		      origin = std::move(origin)] {
+			calldata_t cd;
+			calldata_init(&cd);
+			calldata_set_string(&cd, "owner", owner.c_str());
+			calldata_set_string(&cd, "command", command.c_str());
+			calldata_set_string(&cd, "json", json.c_str());
+			calldata_set_string(&cd, "origin", origin.c_str());
+			signal("luabridge_command", &cd);
+			calldata_free(&cd);
+		});
+	}
+
+	void event(std::string owner, std::string event, std::string json) override
+	{
+		post([owner = std::move(owner), event = std::move(event), json = std::move(json)] {
+			calldata_t cd;
+			calldata_init(&cd);
+			calldata_set_string(&cd, "owner", owner.c_str());
+			calldata_set_string(&cd, "event", event.c_str());
+			calldata_set_string(&cd, "json", json.c_str());
+			signal("luabridge_event", &cd);
+			calldata_free(&cd);
+		});
+	}
+
+	void ready(std::string json) override
+	{
+		post([json = std::move(json)] {
+			calldata_t cd;
+			calldata_init(&cd);
+			calldata_set_string(&cd, "json", json.c_str());
+			signal("luabridge_ready", &cd);
+			calldata_free(&cd);
+		});
+	}
+};
 
 } // namespace
 
@@ -68,48 +123,46 @@ void declare()
 	signal_handler_add_array(obs_get_signal_handler(), decls);
 }
 
-void emit_command(std::string owner, std::string command, std::string json, std::string origin)
+void start()
 {
-	queue([owner = std::move(owner), command = std::move(command), json = std::move(json),
-	       origin = std::move(origin)] {
-		calldata_t cd;
-		calldata_init(&cd);
-		calldata_set_string(&cd, "owner", owner.c_str());
-		calldata_set_string(&cd, "command", command.c_str());
-		calldata_set_string(&cd, "json", json.c_str());
-		calldata_set_string(&cd, "origin", origin.c_str());
-		signal("luabridge_command", &cd);
-		calldata_free(&cd);
-	});
+	std::lock_guard lock(context_mutex);
+	if (!context) {
+		context = new QObject();
+		// Queued emits run in the object's thread, which must be the UI thread
+		if (QCoreApplication *app = QCoreApplication::instance())
+			context->moveToThread(app->thread());
+	}
+	shutting_down = false;
 }
 
-void emit_event(std::string owner, std::string event, std::string json)
+void begin_shutdown()
 {
-	queue([owner = std::move(owner), event = std::move(event), json = std::move(json)] {
-		calldata_t cd;
-		calldata_init(&cd);
-		calldata_set_string(&cd, "owner", owner.c_str());
-		calldata_set_string(&cd, "event", event.c_str());
-		calldata_set_string(&cd, "json", json.c_str());
-		signal("luabridge_event", &cd);
-		calldata_free(&cd);
-	});
+	shutting_down = true;
 }
 
-void emit_ready(std::string json)
+void stop()
 {
-	queue([json = std::move(json)] {
-		calldata_t cd;
-		calldata_init(&cd);
-		calldata_set_string(&cd, "json", json.c_str());
-		signal("luabridge_ready", &cd);
-		calldata_free(&cd);
-	});
+	begin_shutdown();
+
+	QObject *old = nullptr;
+	{
+		std::lock_guard lock(context_mutex);
+		old = context;
+		context = nullptr;
+	}
+	if (!old)
+		return;
+	// ~QObject removes the events still posted to it, so pending emits never run
+	if (old->thread() == QThread::currentThread())
+		delete old;
+	else
+		old->deleteLater();
 }
 
-void set_shutting_down(bool value)
+Emitter &emitter()
 {
-	shutting_down = value;
+	static QtEmitter instance;
+	return instance;
 }
 
-} // namespace luabridge::signals
+} // namespace luabridge::signaling

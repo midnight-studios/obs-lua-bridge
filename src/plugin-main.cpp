@@ -38,18 +38,19 @@ void on_send_test_ping_clicked(void *)
 		return;
 	}
 	obs_log(LOG_INFO, "test ping: emitting luabridge_command(hello, ping, {}, dock)");
-	luabridge::signals::emit_command("hello", "ping", "{}", "dock");
+	luabridge::signaling::emitter().command("hello", "ping", "{}", "dock");
 }
 
 void on_frontend_event(enum obs_frontend_event event, void *)
 {
 	switch (event) {
 	case OBS_FRONTEND_EVENT_FINISHED_LOADING:
-		luabridge::signals::emit_ready(luabridge::info_json());
+		luabridge::signaling::emitter().ready(luabridge::info_json());
 		break;
 	case OBS_FRONTEND_EVENT_EXIT:
-		// No signals to scripts during shutdown (B9)
-		luabridge::signals::set_shutting_down(true);
+		// No signals to scripts during shutdown (B9). Scripts are unloaded during
+		// this event too; their luabridge_unregister calls still work.
+		luabridge::signaling::begin_shutdown();
 		break;
 	default:
 		break;
@@ -60,11 +61,11 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 
 bool obs_module_load(void)
 {
-	luabridge::signals::set_shutting_down(false);
-
 	// Declared here so the signals exist before any script connects to them
-	luabridge::signals::declare();
-	luabridge::register_procs();
+	luabridge::signaling::declare();
+	luabridge::signaling::start();
+	luabridge::register_procs(luabridge::signaling::emitter());
+	luabridge::enable_procs();
 
 	obs_frontend_add_tools_menu_item(obs_module_text("LuaBridge.Menu.SendTestPing"), on_send_test_ping_clicked,
 					 nullptr);
@@ -76,14 +77,17 @@ bool obs_module_load(void)
 
 void obs_module_post_load(void)
 {
-	luabridge::signals::emit_ready(luabridge::info_json());
+	luabridge::signaling::emitter().ready(luabridge::info_json());
 }
 
 void obs_module_unload(void)
 {
-	luabridge::signals::set_shutting_down(true);
-	obs_frontend_remove_event_callback(on_frontend_event, nullptr);
-	// The registry object itself stays alive: scripts may still call procedures
+	// Procedures stay registered (OBS cannot remove them), so they must refuse
+	// work from here on; other modules may still call them in their unload.
+	luabridge::disable_procs();
+	luabridge::signaling::stop();
 	luabridge::registry().clear();
+	// The frontend event callback is not removed: the frontend API is already
+	// gone by now (it is torn down after OBS_FRONTEND_EVENT_EXIT).
 	obs_log(LOG_INFO, "plugin unloaded");
 }

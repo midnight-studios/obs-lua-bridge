@@ -19,17 +19,19 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "procs.hpp"
 
 #include <algorithm>
+#include <atomic>
 
 #include <obs.h>
 #include <plugin-support.h>
-
-#include "signals.hpp"
 
 namespace luabridge {
 
 namespace {
 
 constexpr long long api_version = 1;
+
+std::atomic<bool> procs_enabled{false};
+Emitter *emitter = nullptr; // set once by register_procs, before any procedure can run
 
 std::string_view arg(calldata_t *cd, const char *name)
 {
@@ -96,7 +98,7 @@ void proc_emit(void *, calldata_t *cd)
 	auto json = arg(cd, "json");
 	Result r = registry().check_emit(owner, event, json);
 	if (r.ok)
-		signals::emit_event(std::string(owner), std::string(event), json_or_empty_object(json));
+		emitter->event(std::string(owner), std::string(event), json_or_empty_object(json));
 	finish(cd, "luabridge_emit", owner, r);
 }
 
@@ -113,13 +115,18 @@ void proc_run_command(void *, calldata_t *cd)
 	auto json = arg(cd, "json");
 	Result r = registry().check_command(owner, command, json);
 	if (r.ok)
-		signals::emit_command(std::string(owner), std::string(command), json_or_empty_object(json), "script");
+		emitter->command(std::string(owner), std::string(command), json_or_empty_object(json), "script");
 	finish(cd, "luabridge_run_command", owner, r);
 }
 
 // Procedures are called from C; never let an exception escape
 template<void (*Proc)(void *, calldata_t *)> void safe(void *data, calldata_t *cd)
 {
+	if (!procs_enabled) {
+		calldata_set_bool(cd, "ok", false);
+		calldata_set_string(cd, "error", "plugin unloaded");
+		return;
+	}
 	try {
 		Proc(data, cd);
 	} catch (...) {
@@ -148,8 +155,19 @@ std::string info_json()
 	return info.dump();
 }
 
-void register_procs()
+void enable_procs()
 {
+	procs_enabled = true;
+}
+
+void disable_procs()
+{
+	procs_enabled = false;
+}
+
+void register_procs(Emitter &signal_emitter)
+{
+	emitter = &signal_emitter;
 	proc_handler_t *ph = obs_get_proc_handler();
 	proc_handler_add(ph, "void luabridge_get_info(out bool ok, out string error, out string json)",
 			 safe<proc_get_info>, nullptr);
