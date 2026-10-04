@@ -17,6 +17,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 */
 
 #include "procs.hpp"
+#include "state-events.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -90,10 +91,7 @@ void proc_unregister(void *, calldata_t *cd)
 void proc_set_state(void *, calldata_t *cd)
 {
 	auto owner = arg(cd, "owner");
-	std::string changes;
-	Result r = registry().set_state(owner, arg(cd, "json"), &changes);
-	if (r.ok && changes != "{}")
-		events->state_changed(std::string(owner), changes);
+	Result r = set_state_and_notify(registry(), owner, arg(cd, "json"), *events);
 	finish(cd, "luabridge_set_state", owner, r);
 }
 

@@ -20,6 +20,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 // exits non-zero if any check fails.
 
 #include "event-data.hpp"
+#include "state-events.hpp"
 #include "registry.hpp"
 
 #include <cstdio>
@@ -381,6 +382,66 @@ void test_check_command()
 	CHECK(args == "unchanged");
 }
 
+// Records what the procedures would send to obs-websocket
+struct FakeEventSink final : EventSink {
+	std::vector<std::pair<std::string, std::string>> state_calls; // owner, changes_json
+	std::vector<std::string> custom_calls;
+
+	void state_changed(const std::string &owner, const std::string &changes_json) override
+	{
+		state_calls.emplace_back(owner, changes_json);
+	}
+	void custom_event(const std::string &owner, const std::string &event, const std::string &json) override
+	{
+		custom_calls.push_back(owner + "/" + event + "/" + json);
+	}
+};
+
+void test_state_events()
+{
+	Fixture f;
+	FakeEventSink sink;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S"})"));
+
+	// Returns the StateChanged payload for the sink's last call, or "" if none was made
+	auto last_event = [&]() -> std::string {
+		if (sink.state_calls.empty())
+			return "";
+		const auto &[owner, changes] = sink.state_calls.back();
+		return event_data::state_changed(owner, changes).dump();
+	};
+
+	// Changes only
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"a":1,"b":"x"})", sink));
+	CHECK(sink.state_calls.size() == 1);
+	CHECK(last_event() == R"({"changes":{"a":1,"b":"x"},"owner":"s"})");
+
+	// Removed only
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"a":null})", sink));
+	CHECK(sink.state_calls.size() == 2);
+	CHECK(last_event() == R"({"changes":{},"owner":"s","removed":{"a":true}})");
+
+	// Both
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"b":"y","c":true,"a":null})", sink));
+	CHECK(sink.state_calls.size() == 3);
+	// "a" was already gone, so only b and c are reported, and there is no "removed"
+	CHECK(last_event() == R"({"changes":{"b":"y","c":true},"owner":"s"})");
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"b":"z","c":null})", sink));
+	CHECK(sink.state_calls.size() == 4);
+	CHECK(last_event() == R"({"changes":{"b":"z"},"owner":"s","removed":{"c":true}})");
+
+	// Empty result: nothing changed, so no event at all
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"b":"z"})", sink));
+	CHECK_OK(set_state_and_notify(f.reg, "s", R"({"gone":null})", sink));
+	CHECK(sink.state_calls.size() == 4);
+
+	// A failed set_state sends nothing
+	CHECK_FAIL(set_state_and_notify(f.reg, "s", "{broken", sink), "invalid JSON");
+	CHECK_FAIL(set_state_and_notify(f.reg, "nobody", R"({"a":1})", sink), "owner not registered");
+	CHECK(sink.state_calls.size() == 4);
+	CHECK(sink.custom_calls.empty());
+}
+
 void test_event_data()
 {
 	using event_data::custom_event;
@@ -579,6 +640,7 @@ int main()
 	test_heartbeat_and_stale();
 	test_robustness();
 	test_event_data();
+	test_state_events();
 	test_snapshots();
 	test_threads();
 
