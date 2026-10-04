@@ -7,4 +7,6 @@
 - All script-facing calls: validate input, never crash, return ok/error, log with "[lua-bridge]".
 - Signals to scripts are emitted on the UI thread only (obs_queue_task(OBS_TASK_UI, ...)).
 - Work in small steps: one milestone task per branch/PR; build must pass before you say "done".
+- Never suggest merging a PR until all CI checks have passed. Whenever you say a PR is ready,
+  report the status of each check.
 - Never commit secrets, signing certificates, or files from the user's OBS profile.
