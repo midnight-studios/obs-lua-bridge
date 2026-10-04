@@ -111,6 +111,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=5000, help="requests per request type")
     parser.add_argument("--seed", type=int, default=20261004)
+    parser.add_argument("--requests", nargs="+", default=REQUESTS, choices=REQUESTS,
+                        help="request types to fuzz (default: all)")
+    parser.add_argument("--vendor", default=VENDOR, help="vendor name (another name sends the same traffic "
+                        "without reaching the plugin, as a control)")
     args = parser.parse_args()
     rng = random.Random(args.seed)
 
@@ -120,12 +124,12 @@ def main():
         sys.exit(connect_error(exc))
 
     problems = []
-    stats = {r: Counter() for r in REQUESTS}
+    stats = {r: Counter() for r in args.requests}
     started = time.monotonic()
-    for request_type in REQUESTS:
+    for request_type in args.requests:
         for i in range(args.count):
             data = random_request(rng, request_type)
-            payload = {"vendorName": VENDOR, "requestType": request_type}
+            payload = {"vendorName": args.vendor, "requestType": request_type}
             if data is not None:
                 payload["requestData"] = data
             try:
@@ -154,7 +158,7 @@ def main():
 
     for request_type, counter in stats.items():
         print(f"{request_type}: " + ", ".join(f"{k} x{v}" for k, v in counter.most_common(8)))
-    print(f"{args.count * len(REQUESTS)} requests in {time.monotonic() - started:.0f} s; "
+    print(f"{args.count * len(args.requests)} requests in {time.monotonic() - started:.0f} s; "
           f"OBS still answering: {alive}; problems: {len(problems)}")
     for p in problems[:20]:
         print("PROBLEM", p)

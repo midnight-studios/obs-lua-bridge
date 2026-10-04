@@ -99,6 +99,9 @@ def main():
         script(examples / "stopwatch-x2.lua", instance_id="x"),
     ])
 
+    # Switching to this collection runs the procedure fuzzer once
+    write_collection(base, "LuaBridge Fuzz", "LuaBridge_Fuzz.json", [script(ROOT / "tests/lua/fuzz-harness.lua")])
+
     profile = BASIC / "profiles" / "LuaBridge_P2"
     if not profile.exists():
         shutil.copytree(BASIC / "profiles" / "Untitled", profile)
