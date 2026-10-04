@@ -32,4 +32,11 @@ namespace luabridge {
 // one key changed, calls events.state_changed with the registry's change set.
 Result set_state_and_notify(Registry &registry, std::string_view owner, std::string_view json, EventSink &events);
 
+// luabridge_register: on success calls events.owner_registered.
+Result register_and_notify(Registry &registry, std::string_view owner, std::string_view json, EventSink &events);
+
+// luabridge_unregister and the dock's Remove button: calls events.owner_unregistered
+// only if a registration was actually removed. *removed (if given) says whether it was.
+Result unregister_and_notify(Registry &registry, std::string_view owner, EventSink &events, bool *removed = nullptr);
+
 } // namespace luabridge

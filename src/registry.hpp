@@ -23,6 +23,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 // All public methods are thread-safe and never throw.
 
 #include <chrono>
+#include <cstdint>
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -80,12 +81,14 @@ struct Owner {
 	nlohmann::json dock = nlohmann::json::array();   // validated controls, invalid ones removed
 	std::map<std::string, nlohmann::json> state;     // scalar values only
 	std::optional<Clock::time_point> last_heartbeat; // set by heartbeat() only
+	std::uint64_t generation = 0;                    // unique per registration; changes when the owner re-registers
 };
 
 struct OwnerSummary {
 	std::string id;
 	std::string display_name;
 	bool stale = false;
+	std::uint64_t generation = 0; // see Owner::generation
 };
 
 struct Result {
@@ -131,6 +134,8 @@ public:
 	Result get_commands(std::string_view owner, nlohmann::json &out) const;
 	// out = {key: value, ...}
 	Result get_state(std::string_view owner, nlohmann::json &out) const;
+	// out = the validated dock controls (invalid ones were removed at registration)
+	Result get_dock(std::string_view owner, nlohmann::json &out) const;
 
 	bool is_stale(std::string_view owner) const;
 	std::size_t owner_count() const;
@@ -143,6 +148,7 @@ private:
 	mutable std::mutex mutex_;
 	std::map<std::string, Owner, std::less<>> owners_;
 	std::function<Clock::time_point()> now_;
+	std::uint64_t next_generation_ = 1;
 };
 
 } // namespace luabridge

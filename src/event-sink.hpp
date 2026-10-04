@@ -18,9 +18,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #pragma once
 
-// Events for external clients (obs-websocket vendor events, spec B8), kept free
-// of Qt and libobs. Implementations may be called from any thread and must not
-// call back into the procedures.
+// Notifications for everything outside the scripts that shows bridge data:
+// obs-websocket vendor events (spec B8) and the dock (M3). Kept free of Qt and
+// libobs. Implementations may be called from any thread and must not call back
+// into the procedures.
 
 #include <string>
 
@@ -35,6 +36,10 @@ public:
 	virtual void state_changed(const std::string &owner, const std::string &changes_json) = 0;
 	// json is the event data object passed to luabridge_emit
 	virtual void custom_event(const std::string &owner, const std::string &event, const std::string &json) = 0;
+	// An owner registered or re-registered (its commands, dock and state were replaced)
+	virtual void owner_registered(const std::string & /*owner*/) {}
+	// An owner was removed (luabridge_unregister, or Remove in the dock)
+	virtual void owner_unregistered(const std::string & /*owner*/) {}
 };
 
 } // namespace luabridge

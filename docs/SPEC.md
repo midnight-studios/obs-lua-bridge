@@ -162,7 +162,12 @@ Declared on `obs_get_signal_handler()` in `obs_module_load`:
 | `luabridge_event` | `string owner, string event, string json` | Any owner calls `luabridge_emit`. This lets scripts listen to each other |
 | `luabridge_ready` | `string json` (info) | The plugin finished loading, and again on `OBS_FRONTEND_EVENT_FINISHED_LOADING` |
 
-**Threading rule:** All signals to scripts are emitted on the **UI thread**. Websocket requests arrive on obs-websocket's thread, so the plugin marshals them with `obs_queue_task(OBS_TASK_UI, …)` before emitting. This keeps script callbacks safe and their order predictable.
+**Threading rule:** All signals to scripts are delivered **asynchronously** on the **UI thread**, after the call that caused them returns, in **FIFO order**.
+- Procedures can be called from any thread: the UI thread, the graphics thread (Lua timers) or obs-websocket's worker threads. Every emit is therefore posted with `QMetaObject::invokeMethod(…, Qt::QueuedConnection)` to a `QObject` the plugin owns.
+- `obs_queue_task(OBS_TASK_UI, …)` is **not** used: when called on the UI thread it runs the task immediately, which would re-enter the calling script and break ordering.
+- Nothing is emitted once shutdown begins. Deleting the plugin's `QObject` at unload discards emits that are still queued.
+
+This keeps script callbacks safe and their order predictable.
 
 ### B7. Registration JSON (v1)
 
@@ -331,6 +336,7 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - **Done when:** The stopwatch example (M4) is fully controllable from the dock, and the dock survives script reload, owner removal, and an OBS restart.
 
 ### M4 — Lua helper and reference integrations (2 days)
+- **First:** button `label_bind`. A `button` control may name a state key; while that key is set, the button shows its value, and when it's unset (`null`) it shows the command's label again. The Stopwatch's Start/Pause button needs it. Add unit tests, an API.md entry, and a dock-test demo ("Starting…" → "Started ✓").
 - `luabridge.lua` (B10), with a JSON encoder/decoder and a test harness.
 - **Example 1:** Stopwatch 5.10 integration. Start, Pause, Reset, Add/Subtract and a live display in the dock; websocket commands that don't depend on the script's filename.
 - **Example 2:** a minimal Score Board demo (state → dock and websocket events).

@@ -402,8 +402,20 @@ private:
 				}
 			}
 		} else if (type == "toggle") {
-			if (!require_state_key(c, "bind", where) || !require_command(c, where))
+			if (!require_state_key(c, "bind", where))
 				return false;
+			const Command *cmd = require_command(c, where);
+			if (!cmd)
+				return false;
+			// A toggle sends {"value": true|false}, so its command must accept that
+			bool takes_bool_value = false;
+			for (const auto &[name, arg_type] : cmd->args)
+				takes_bool_value = takes_bool_value || (name == "value" && arg_type == ArgType::Bool);
+			if (!takes_bool_value) {
+				skip(where,
+				     "toggle command " + quote_id(cmd->id) + " must declare arg 'value' of type bool");
+				return false;
+			}
 		} else if (type == "number") {
 			if (!require_new_id(c, where))
 				return false;
@@ -601,6 +613,7 @@ Result Registry::register_owner(std::string_view owner_id, std::string_view text
 			return r;
 
 		std::lock_guard lock(mutex_);
+		owner.generation = next_generation_++;
 		auto it = owners_.find(owner_id);
 		if (it == owners_.end()) {
 			if (owners_.size() >= limits::max_owners)
@@ -786,7 +799,7 @@ std::vector<OwnerSummary> Registry::list_owners() const
 	std::vector<OwnerSummary> out;
 	out.reserve(owners_.size());
 	for (const auto &[id, owner] : owners_)
-		out.push_back({id, owner.display_name, is_stale_locked(owner)});
+		out.push_back({id, owner.display_name, is_stale_locked(owner), owner.generation});
 	return out;
 }
 
@@ -832,6 +845,22 @@ Result Registry::get_state(std::string_view owner_id, json &out) const
 		out = json::object();
 		for (const auto &[key, value] : owner->second.state)
 			out[key] = value;
+		return r;
+	});
+}
+
+Result Registry::get_dock(std::string_view owner_id, json &out) const
+{
+	return guarded([&] {
+		Result r = check_owner_arg(owner_id);
+		if (!r.ok)
+			return r;
+
+		std::lock_guard lock(mutex_);
+		auto owner = owners_.find(owner_id);
+		if (owner == owners_.end())
+			return Result::failure("owner not registered");
+		out = owner->second.dock;
 		return r;
 	});
 }

@@ -19,7 +19,9 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 // Unit tests for the registry (no OBS needed). Run with ctest or directly;
 // exits non-zero if any check fails.
 
+#include "dock-logic.hpp"
 #include "event-data.hpp"
+#include "fan-out-sink.hpp"
 #include "state-events.hpp"
 #include "registry.hpp"
 
@@ -87,7 +89,8 @@ std::string with_commands(int count)
 
 std::string with_dock(const std::string &dock)
 {
-	return R"({"display_name":"T","commands":[{"id":"go","args":{"n":"int"}}],"dock":)" + dock + "}";
+	return R"({"display_name":"T","commands":[{"id":"go","args":{"n":"int"}},{"id":"flip","args":{"value":"bool"}}],"dock":)" +
+	       dock + "}";
 }
 
 const char *b7_example = R"({
@@ -273,13 +276,21 @@ void test_dock()
 
 	r = f.reg.register_owner(
 		"d", with_dock(R"([{"type":"number","id":"v"},{"type":"button","command":"go","args_from":{"n":"v"}},)"
-			       R"({"type":"toggle","bind":"on","command":"go"},{"type":"text","id":"t"}])"));
+			       R"({"type":"toggle","bind":"on","command":"flip"},{"type":"text","id":"t"}])"));
 	CHECK(r.ok);
 	CHECK(r.warnings.empty());
 
 	r = f.reg.register_owner("d", with_dock(R"([{"type":"number","id":"v"},{"type":"text","id":"v"}])"));
 	CHECK(r.ok);
 	CHECK(has_warning(r, "duplicate id 'v'"));
+
+	// A toggle sends {"value": bool}, so its command must declare that arg
+	r = f.reg.register_owner("d", with_dock(R"([{"type":"toggle","bind":"on","command":"go"}])"));
+	CHECK(r.ok);
+	CHECK(has_warning(r, "toggle command 'go' must declare arg 'value' of type bool"));
+	nlohmann::json dock;
+	CHECK_OK(f.reg.get_dock("d", dock));
+	CHECK(dock.dump() == "[]");
 
 	std::string controls;
 	for (std::size_t i = 0; i < limits::max_dock_controls; ++i)
@@ -440,6 +451,144 @@ void test_state_events()
 	CHECK_FAIL(set_state_and_notify(f.reg, "nobody", R"({"a":1})", sink), "owner not registered");
 	CHECK(sink.state_calls.size() == 4);
 	CHECK(sink.custom_calls.empty());
+}
+
+// Records registration notifications for the dock tests
+struct RecordingSink final : EventSink {
+	std::vector<std::string> calls;
+
+	void state_changed(const std::string &owner, const std::string &changes) override
+	{
+		calls.push_back("state:" + owner + ":" + changes);
+	}
+	void custom_event(const std::string &owner, const std::string &event, const std::string &) override
+	{
+		calls.push_back("event:" + owner + ":" + event);
+	}
+	void owner_registered(const std::string &owner) override { calls.push_back("registered:" + owner); }
+	void owner_unregistered(const std::string &owner) override { calls.push_back("unregistered:" + owner); }
+};
+
+void test_registration_events()
+{
+	Fixture f;
+	RecordingSink a, b;
+	FanOutEventSink both{&a, &b};
+
+	// Notifications only on success, forwarded to every sink in order
+	CHECK_OK(register_and_notify(f.reg, "x", R"({"display_name":"X"})", both));
+	CHECK_FAIL(register_and_notify(f.reg, "y", "{broken", both), "invalid JSON");
+	CHECK_OK(set_state_and_notify(f.reg, "x", R"({"k":1})", both));
+	both.custom_event("x", "e", "{}");
+	bool removed = false;
+	CHECK_OK(unregister_and_notify(f.reg, "x", both, &removed));
+	CHECK(removed);
+	CHECK_OK(unregister_and_notify(f.reg, "x", both, &removed)); // already gone: no notification
+	CHECK(!removed);
+	CHECK_OK(unregister_and_notify(f.reg, "never", both));
+	const std::vector<std::string> expected = {"registered:x", R"(state:x:{"k":1})", "event:x:e", "unregistered:x"};
+	CHECK(a.calls == expected);
+	CHECK(b.calls == expected);
+
+	// generation changes on every (re-)registration
+	CHECK_OK(f.reg.register_owner("g", R"({"display_name":"G"})"));
+	auto first = f.reg.list_owners();
+	CHECK_OK(f.reg.register_owner("g", R"({"display_name":"G2"})"));
+	auto second = f.reg.list_owners();
+	CHECK(first.size() == 1 && second.size() == 1 && second[0].generation > first[0].generation);
+	CHECK(second.size() == 1 && second[0].display_name == "G2");
+
+	// get_dock returns the validated controls only
+	CHECK_OK(f.reg.register_owner("d", with_dock(R"([{"type":"separator"},{"type":"slider"}])")));
+	nlohmann::json dock;
+	CHECK_OK(f.reg.get_dock("d", dock));
+	CHECK(dock.dump() == R"([{"type":"separator"}])");
+	CHECK_FAIL(f.reg.get_dock("nobody", dock), "owner not registered");
+
+	// The dock's Remove button on a stale owner: removed, notified, and it can come back
+	RecordingSink sink;
+	CHECK_OK(f.reg.register_owner("s", R"({"display_name":"S"})"));
+	CHECK_OK(f.reg.heartbeat("s"));
+	f.advance(31s);
+	CHECK(f.reg.is_stale("s"));
+	CHECK_OK(unregister_and_notify(f.reg, "s", sink));
+	CHECK(sink.calls == std::vector<std::string>{"unregistered:s"});
+	bool listed = false;
+	for (const auto &o : f.reg.list_owners())
+		listed = listed || o.id == "s";
+	CHECK(!listed);
+	CHECK_FAIL(f.reg.set_state("s", R"({"a":1})", nullptr), "owner not registered");
+	CHECK_OK(register_and_notify(f.reg, "s", R"({"display_name":"S"})", sink));
+	CHECK(!f.reg.is_stale("s"));
+}
+
+void test_dock_logic()
+{
+	using namespace dock_logic;
+	using nlohmann::json;
+	auto summary = [](std::string id, std::uint64_t gen, bool stale = false) {
+		return OwnerSummary{std::move(id), "D", stale, gen};
+	};
+
+	// First registration: create, in registration order
+	SectionPlan p = plan_sections({}, {summary("b", 2), summary("a", 5), summary("c", 1)});
+	CHECK(p.create.size() == 3 && p.create[0].id == "c" && p.create[1].id == "b" && p.create[2].id == "a");
+	CHECK(p.remove.empty() && p.rebuild.empty() && p.stale_changes.empty());
+
+	// Nothing changed
+	std::vector<ShownSection> shown = {{"c", 1, false}, {"b", 2, false}, {"a", 5, false}};
+	p = plan_sections(shown, {summary("a", 5), summary("b", 2), summary("c", 1)});
+	CHECK(p.create.empty() && p.remove.empty() && p.rebuild.empty() && p.stale_changes.empty());
+
+	// Unregister: remove
+	p = plan_sections(shown, {summary("a", 5), summary("c", 1)});
+	CHECK(p.remove == std::vector<std::string>{"b"} && p.create.empty() && p.rebuild.empty());
+
+	// Reload (unregister + register before the reconcile runs): one rebuild in place
+	p = plan_sections(shown, {summary("a", 5), summary("b", 9), summary("c", 1)});
+	CHECK(p.rebuild.size() == 1 && p.rebuild[0].id == "b" && p.create.empty() && p.remove.empty());
+
+	// Stale flips without re-registration
+	p = plan_sections(shown, {summary("a", 5, true), summary("b", 2), summary("c", 1)});
+	CHECK(p.stale_changes.size() == 1 && p.stale_changes[0].first == "a" && p.stale_changes[0].second);
+	p = plan_sections({{"a", 5, true}}, {summary("a", 5, false)});
+	CHECK(p.stale_changes.size() == 1 && !p.stale_changes[0].second);
+	// Re-registering a stale owner rebuilds it (fresh) rather than only flipping stale
+	p = plan_sections({{"a", 5, true}}, {summary("a", 6, false)});
+	CHECK(p.rebuild.size() == 1 && p.stale_changes.empty());
+
+	// Removed from the dock, then registered again: a new section
+	p = plan_sections({}, {summary("a", 7)});
+	CHECK(p.create.size() == 1 && p.create[0].id == "a");
+
+	// Label text
+	json s = "hello", i = 42, f1 = 0.1, f2 = 2.50, t = true, n = nullptr;
+	CHECK(format_state_value(&s) == "hello");
+	CHECK(format_state_value(&i) == "42");
+	CHECK(format_state_value(&f1) == "0.1");
+	CHECK(format_state_value(&f2) == "2.5");
+	CHECK(format_state_value(&t) == "true");
+	CHECK(format_state_value(&n) == std::string("\xe2\x80\x94"));
+	CHECK(format_state_value(nullptr) == std::string("\xe2\x80\x94"));
+
+	// Spin box type
+	CHECK(number_is_integer(json::parse(R"({"type":"number","id":"n","min":1,"max":3600,"default":1})")));
+	CHECK(number_is_integer(json::parse(R"({"type":"number","id":"n"})")));
+	CHECK(number_is_integer(json::parse(R"({"type":"number","id":"n","max":10.0})")));
+	CHECK(!number_is_integer(json::parse(R"({"type":"number","id":"n","min":0,"max":1,"default":0.5})")));
+
+	// Button args
+	json command = json::parse(R"({"id":"add","args":{"seconds":"int","rate":"number","name":"string"}})");
+	json button = json::parse(
+		R"({"type":"button","command":"add","args_from":{"seconds":"secs","rate":"r","name":"nm","missing":"nope"}})");
+	std::map<std::string, json> values = {{"secs", 5.0}, {"r", 1.5}, {"nm", "x"}};
+	CHECK(build_button_args(button, command, values).dump() == R"({"name":"x","rate":1.5,"seconds":5})");
+	values["secs"] = 1.5; // not whole: passed on so check_command reports it
+	CHECK(build_button_args(button, command, values).dump() == R"({"name":"x","rate":1.5,"seconds":1.5})");
+	values["nm"] = 7; // a number control feeding a string arg
+	values.erase("r");
+	CHECK(build_button_args(button, command, values).dump() == R"({"name":"7","seconds":1.5})");
+	CHECK(build_button_args(json::parse(R"({"type":"button","command":"add"})"), command, values).dump() == "{}");
 }
 
 void test_event_data()
@@ -640,6 +789,8 @@ int main()
 	test_heartbeat_and_stale();
 	test_robustness();
 	test_event_data();
+	test_registration_events();
+	test_dock_logic();
 	test_state_events();
 	test_snapshots();
 	test_threads();
