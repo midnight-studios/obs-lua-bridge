@@ -19,7 +19,8 @@ only in the private, archived `obs-lua-bridge-dev`.
 - Run `git remote prune origin` in them. This was done in the maintainer's working copy on 2026-10-05.
 
 **Pattern search** over the full history of every commit and over the working tree, including the M7 files:
-- **The patterns:** email addresses, `jacques`/`joubert`, `C:\Users\`, `/Users/<name>`, `AppData`, `GRUMPY~1`,
+- **The patterns:** email addresses, the maintainer's real name and former email address (the exact search
+  terms are kept out of the repo), `C:\Users\`, `/Users/<name>`, `AppData`, the Windows short user path,
   private IPs (`10.x`, `172.16–31.x`, `192.168.x`), GitHub/AWS/Slack token formats, private keys, and
   `password=`/`token=` literals.
 - **The findings**, none of them a problem:
@@ -43,8 +44,33 @@ gitleaks dir <copy of the working tree: tracked + new files, without build_* and
 ```
 
 - [x] Scan done; nothing to remove
-- [ ] **(maintainer)** Re-run if anything is committed between this PR and going public:
-  `gitleaks git . --log-opts="--all" --redact`
+- [x] **(maintainer)** Re-run if anything is committed between this PR and going public:
+  `gitleaks git . --log-opts="--all" --redact`. **Re-run on 2026-10-05,** after PRs #2–#4 were merged; see
+  below.
+
+### Re-run on 2026-10-05 (head of the launch-settings PR)
+**Commit identities** (fresh clone, all 5 branches, 60 commits):
+- `GrumpyDog` with the noreply address: 45;
+- `midnight-studios` with the noreply address, committed by `GitHub <noreply@github.com>`: 14 (PR merges);
+- `dependabot[bot]` with its noreply address: 1.
+
+No real email address.
+
+**gitleaks 8.30.1:**
+```
+gitleaks git <fresh clone, --log-opts="--all"> --no-banner --redact   → 46 commits: no leaks found (exit 0)
+gitleaks dir <PR head working tree, 172 files> --no-banner --redact   → no leaks found (exit 0)
+```
+
+**Pattern search:** one finding, introduced by this checklist itself.
+- **The finding:** the first version of section 1, in the M7 commit `5d282f8`, listed the maintainer's first
+  name and surname as search terms.
+- **The fix:** this PR removes them from the file, and the exact terms are now kept out of the repo.
+- **What remains:** they **remain in the git history** of `master` (from `5d282f8`, merged with PR #2) and in
+  the pull-request refs of PRs #2, #4 and #5.
+- **Whether to purge them** (history rewrite, or GitHub Support) **is the maintainer's decision.**
+- **Every other finding** is the same as above: third-party notices, the noreply address, placeholders, the
+  SDK version, and the scan's own descriptions.
 
 ## 2. License files
 - [x] `LICENSE`: GPL-2.0, for the plugin
@@ -87,8 +113,10 @@ Ruleset "protect master" (id 24481055), active, targeting the default branch (`m
 - [x] **Dependabot security updates: enabled.**
 - [x] Dependabot version updates: already configured in `.github/dependabot.yml` (GitHub Actions, monthly)
 - [x] Secret scanning: enabled.
-- [ ] **Push protection: still disabled** (`secret_scanning_push_protection: disabled` on 2026-10-05). Enable
-  in Settings → Code security → Secret Protection → Push protection.
+- [ ] **Push protection: still disabled.** Re-checked on 2026-10-05 after the maintainer reported enabling it:
+  the repository API still says `secret_scanning_push_protection: disabled`, while secret scanning says
+  `enabled`. The setting is per repository, in this repo's Settings → Code security → Secret Protection →
+  Push protection. The personal setting "Push protection for yourself" is a different switch.
 
 **Settings → Actions → General:**
 - [x] Actions enabled, all actions allowed (as today)
@@ -120,7 +148,8 @@ Ruleset "protect master" (id 24481055), active, targeting the default branch (`m
   up to `ddc4537`)
 
 ## 5. Go / no-go: in this order, all decisions by the maintainer
-1. [ ] Sections 1–4 done; nothing committed since the scan, or the scan re-run
+1. [ ] Sections 1–4 done; nothing committed since the scan, or the scan re-run. **Not ticked:** the re-run found
+   the maintainer's name in the history (section 1), and push protection is still off (section 3).
 2. [x] **Make the repository public** (Settings → General → Danger Zone → Change visibility). Confirmed
    without a token: `visibility: public`.
 3. [x] Apply section 3's settings: the ruleset, private vulnerability reporting, Dependabot alerts. Still open in
