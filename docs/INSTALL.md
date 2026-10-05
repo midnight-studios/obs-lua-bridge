@@ -92,3 +92,11 @@ Start OBS and open **Docks → Lua Bridge**. Without scripts it says no scripts
 are registered. Add `lua/examples/hello-bridge.lua` in **Tools → Scripts**: a
 "Hello Bridge" section with a **Ping** button appears. The OBS log (**Help → Log
 Files**) contains `[lua-bridge] plugin loaded successfully`.
+
+## FAQ
+**The dock doesn't show up.** New plugin docks start hidden: turn it on in **Docks → Lua Bridge**.
+
+**OBS 33's Plugin Manager shows Lua Bridge as "Legacy".** On OBS 33+, the Plugin Manager may show Lua Bridge as
+"Legacy". It still works; this is OBS's new plugin layout. Lua Bridge will move to the new layout once the
+official plugin template does, without breaking OBS 31.1–32.
+([Tracking issue](https://github.com/midnight-studios/obs-lua-bridge/issues/6))
