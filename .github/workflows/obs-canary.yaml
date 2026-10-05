@@ -5,6 +5,12 @@ run-name: OBS canary build 🐤
 # noticed before users report it. Linux needs no canary: its CI builds already
 # use the newest OBS from the official PPA. Nothing is committed; the result is
 # a GitHub issue.
+#
+# It only BUILDS against the new OBS. It doesn't load the plugin into it, so it
+# can't catch runtime changes such as OBS 33's new plugin layout (the "Legacy"
+# label in the Plugin Manager, issue #6). Loading on OBS 33 must be tested by
+# hand, in a portable OBS 33. It also follows /releases/latest, which skips pre-releases,
+# so it doesn't build against OBS betas.
 on:
   schedule:
     - cron: '17 6 * * 1' # Mondays 06:17 UTC
