@@ -61,7 +61,7 @@ jobs:
             *) echo 'validTag=false' >> $GITHUB_OUTPUT ;;
           esac
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: fromJSON(steps.check.outputs.validTag)
         with:
           path: source
@@ -94,7 +94,7 @@ jobs:
           rm -rf "${name}" source
 
       - name: Download Build Artifacts 📥
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         if: fromJSON(steps.check.outputs.validTag)
         id: download
 
@@ -142,7 +142,7 @@ jobs:
       - name: Create Release 🛫
         if: fromJSON(steps.check.outputs.validTag)
         id: create_release
-        uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           draft: true
           prerelease: ${{ fromJSON(steps.check.outputs.prerelease) }}

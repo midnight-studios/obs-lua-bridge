@@ -20,7 +20,7 @@ jobs:
       latest: ${{ steps.check.outputs.latest }}
       newer: ${{ steps.check.outputs.newer }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Compare buildspec.json with the Latest OBS Release 🔢
         id: check
@@ -58,7 +58,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           fetch-depth: 0
