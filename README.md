@@ -4,7 +4,7 @@
 
 Lua Bridge gives your OBS Lua scripts what OBS's own scripting can't do:
 - **Controls in a dock:** buttons, labels, number and text inputs, and toggles in **Docks → Lua Bridge**.
-- **Commands:** from that dock, from other scripts, or from obs-websocket tools such as Stream Deck, Companion or Streamer.bot (see [control surfaces](docs/integrations/control-surfaces.md)).
+- **Commands:** from that dock, from other scripts, or from obs-websocket 5 tools. Confirmed so far: Bitfocus Companion. See [control surfaces](docs/integrations/control-surfaces.md).
 - **Live state and custom events** that other scripts and websocket clients can follow.
 
 Scripts written for it keep working when the plugin isn't installed: they simply run without the dock.
@@ -57,11 +57,18 @@ They ship with the plugin in `lua/examples/`, and are also available on their ow
 - **stopwatch-demo**: a stopwatch controlled from the dock, shown in a text source.
 - **ping-pong**: two scripts talking to each other, with commands one way and events back.
 
+## Using a Stream Deck
+Use [Bitfocus Companion](https://bitfocus.io/companion). It drives Stream Deck hardware directly, and its OBS
+module can send Lua Bridge commands ("Custom – Send Vendor Request").
+- **Quit Elgato's Stream Deck app first.** Companion's guide recommends connecting Stream Decks without the
+  Elgato software ([source](https://companion.free/user-guide/v4.2/surfaces/elgato-streamdeck/)).
+- **Setup:** [control surfaces](docs/integrations/control-surfaces.md#using-a-stream-deck).
+
 ## Learn more
 - [docs/API.md](docs/API.md): the script API, dock controls, the helper library and the obs-websocket requests.
 - [docs/INSTALL.md](docs/INSTALL.md): install and uninstall on every platform.
 - [lua/README.txt](lua/README.txt): the helper and the examples.
-- [docs/integrations/control-surfaces.md](docs/integrations/control-surfaces.md): Stream Deck, Companion, Touch Portal and Streamer.bot.
+- [docs/integrations/control-surfaces.md](docs/integrations/control-surfaces.md): sending commands from control surfaces. Companion is confirmed; others are being checked.
 - [CHANGELOG.md](CHANGELOG.md): what's new. [CONTRIBUTING.md](CONTRIBUTING.md): building and testing.
 
 ## License

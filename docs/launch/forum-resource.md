@@ -50,9 +50,16 @@ Full instructions: {{docs/INSTALL.md link}}. Then try `lua/examples/hello-bridge
   See below.
 - **Ubuntu 24.04 x86_64:** builds in CI; package contents checked. Other distributions can use the tarball.
 - **Control surfaces:**
-  - Bitfocus Companion has a "Send Vendor Request" action;
-  - Streamer.bot (OBS Raw) and Touch Portal (Custom Request) likely work but are unverified;
+  - **confirmed:** Bitfocus Companion, through its "Custom – Send Vendor Request" action;
+  - Streamer.bot, Touch Portal and Elgato's own Stream Deck plugin are unverified so far;
   - details: {{docs/integrations/control-surfaces.md link}}.
+
+## Using a Stream Deck
+Use **Bitfocus Companion**. It drives Stream Deck hardware directly, and its OBS module sends Lua Bridge
+commands.
+- **Quit Elgato's Stream Deck app first.** Companion's guide recommends connecting Stream Decks without the
+  Elgato software: https://companion.free/user-guide/v4.2/surfaces/elgato-streamdeck/
+- **Setup steps:** {{control-surfaces.md#using-a-stream-deck link}}.
 
 ## Beta notice
 - **This is the first public release.** The script API (`api_version` 1) is intended to stay compatible, with

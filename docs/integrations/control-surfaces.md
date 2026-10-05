@@ -46,8 +46,33 @@ The response appears in the module's `custom_command_*` variables. Vendor events
 - Source: [companion-module-obs-studio HELP.md](https://github.com/bitfocus/companion-module-obs-studio/blob/main/companion/HELP.md)
   (it recommends OBS 32.1 or newer). Older wording with a `CallVendorRequest` example:
   [companion-bundled-modules HELP.md](https://github.com/bitfocus/companion-bundled-modules/blob/main/obs-studio/companion/HELP.md).
-- Companion also drives Stream Deck hardware, so it's the most reliable way to put Lua Bridge commands
-  on a Stream Deck today.
+- Companion also drives Stream Deck hardware; see [Using a Stream Deck](#using-a-stream-deck).
+
+## Using a Stream Deck
+**Confirmed route: Bitfocus Companion.**
+- Companion drives Elgato Stream Deck hardware directly, without Elgato's Stream Deck app.
+- Its official user guide lists the supported models: Stream Deck (15 key), Mini, XL, Mk2, Pedal, +, Neo and
+  Studio.
+- It says: *"We recommend connecting Stream Decks without the Elgato software."*
+  Source: [Companion user guide: Elgato Stream Deck](https://companion.free/user-guide/v4.2/surfaces/elgato-streamdeck/)
+  (the guide linked from [Bitfocus's Companion repository](https://github.com/bitfocus/companion)).
+
+**Setup:**
+1. **Quit Elgato's Stream Deck app,** including its tray/menu-bar icon.
+   - Both programs want the same USB device. Companion's issue tracker shows conflicts when both run, e.g.
+     [#1760](https://github.com/bitfocus/companion/issues/1760). The "quit it" step is our advice based on this;
+     the guide itself only recommends connecting without the Elgato software.
+   - If the Stream Deck doesn't appear in Companion, check that no Elgato Stream Deck process is still running,
+     then use **Rescan USB** in Companion's Surfaces tab.
+2. **In Companion, add the OBS Studio connection** (host, port 4455, the WebSocket password).
+3. **Put a button on the Stream Deck page** with the action **"Custom – Send Vendor Request"**:
+   - vendor `LuaBridge`;
+   - request type `RunCommand`;
+   - data such as `{"owner": "hello", "command": "ping"}`.
+
+To keep Elgato's app for other buttons, there's a separate opt-in "Elgato Plugin" mode, in which Companion
+shows its buttons inside the Elgato app. We haven't tested it; see the
+[Companion guide](https://companion.free/user-guide/v4.2/surfaces/elgato-plugin/).
 
 ## Streamer.bot
 **Most likely supported.** The **OBS Raw** sub-action "sends custom requests directly to the OBS WebSocket
@@ -90,7 +115,8 @@ type through, use:
   [OBS Tools: Getting Started](https://docs.barraider.com/faqs/obs-tools/getting-started/).
 
 **Options for Stream Deck users today:**
-1. **Companion** (above), which can run Stream Deck hardware itself, with a "Custom – Send Vendor Request" button.
+1. **Companion,** which drives Stream Deck hardware itself; see [Using a Stream Deck](#using-a-stream-deck).
+   This is the confirmed route.
 2. **A Stream Deck plugin that sends raw websocket messages:** the request is plain JSON over obs-websocket 5,
    but the client must also handle the obs-websocket handshake, so a generic WebSocket-message plugin isn't
    enough. *Unverified; not tested.*
