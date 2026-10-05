@@ -2,9 +2,9 @@ name: Pull Request
 run-name: ${{ github.event.pull_request.title }} pull request run 🚀
 on:
   workflow_dispatch:
+  # No paths-ignore: the master ruleset requires this workflow's checks, so it
+  # must run on every PR, docs-only ones included, or they could never merge
   pull_request:
-    paths-ignore:
-      - '**.md'
     branches: [master, main]
     types: [ opened, synchronize, reopened ]
 permissions:
