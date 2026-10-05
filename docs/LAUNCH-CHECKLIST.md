@@ -116,4 +116,4 @@ the switch.
 6. [ ] Publish the release
 7. [ ] Post the forum resource (`docs/launch/forum-resource.md`), then send the messages to Exeldro and the OBS
    team (`docs/launch/`)
-8. [ ] Add the dock screenshot to the README (`docs/images/dock.png`)
+8. [x] Add the dock screenshot to the README (`docs/images/dock.png`; checked: nothing personal visible, no embedded metadata, 43 KB)

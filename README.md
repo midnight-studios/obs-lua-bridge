@@ -9,8 +9,7 @@ Lua Bridge gives your OBS Lua scripts what OBS's own scripting can't do:
 
 Scripts written for it keep working when the plugin isn't installed: they simply run without the dock.
 
-![The Lua Bridge dock with the Score Board and Stopwatch examples](docs/images/dock.png)
-*(Screenshot to be added.)*
+![Lua Bridge dock controlling a stopwatch, with two scripts talking via ping-pong](docs/images/dock.png)
 
 ## Install
 Requires **OBS Studio 31.1 or newer**. Download the file for your system from
