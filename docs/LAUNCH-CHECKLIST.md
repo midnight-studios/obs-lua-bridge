@@ -62,37 +62,48 @@ gitleaks dir <copy of the working tree: tracked + new files, without build_* and
 Branch protection and rulesets aren't available for private repositories on the free plan, so these wait for
 the switch.
 
-**Settings → Rules → Rulesets → New branch ruleset**, target `master`, enforcement **Active**:
-- [ ] Require a pull request before merging; required approvals **0** while there's one maintainer
-- [ ] Require status checks to pass:
+*Checked on 2026-10-05 after the switch to public:*
+- **Without a token:** the visibility and the rules that apply to `master`, via
+  `GET /repos/…/obs-lua-bridge` and `GET /repos/…/rules/branches/master`;
+- **with the maintainer's `gh` login:** the ruleset's bypass list and the security settings, which GitHub only
+  shows to admins.
+
+**Settings → Rules → Rulesets → New branch ruleset**, target `master`, enforcement **Active**.
+Ruleset "protect master" (id 24481055), active, targeting the default branch (`master`):
+- [x] Require a pull request before merging; required approvals **0** while there's one maintainer
+- [x] Require status checks to pass:
   - `Unit Tests 🧪 (ubuntu-24.04)`, `Unit Tests 🧪 (macos-15)`, `Unit Tests 🧪 (windows-2022)`;
   - `Build for Ubuntu 🐧 (ubuntu-24.04)`, `Build for macOS 🍏`, `Build for Windows 🪟`;
   - `clang-format`, `gersemi`.
 
-  Pick them from the list after one PR has run in the public repo.
-- [ ] Block force pushes
-- [ ] Restrict deletions
-- [ ] (Optional) Bypass list: yourself, for emergencies only
+  All 8 are required, under their full CI names (e.g. `Unit Tests 🧪 / Unit Tests 🧪 (macos-15)`).
+- [x] Block force pushes (`non_fast_forward`)
+- [x] Restrict deletions (`deletion`)
+- [x] Bypass list: repository role **Admin**, mode "always" (the maintainer's emergency bypass)
 
 **Settings → Code security:**
-- [ ] **Private vulnerability reporting: enable.** `SECURITY.md` and the issue template link to it.
-- [ ] **Dependabot alerts: enable.**
-- [ ] **Dependabot security updates: enable.**
+- [x] **Private vulnerability reporting: enabled.** `SECURITY.md` and the issue template link to it.
+- [x] **Dependabot alerts: enabled.**
+- [x] **Dependabot security updates: enabled.**
 - [x] Dependabot version updates: already configured in `.github/dependabot.yml` (GitHub Actions, monthly)
-- [ ] (Optional) Secret scanning and push protection: enable. They're free for public repos.
+- [x] Secret scanning: enabled.
+- [ ] **Push protection: still disabled** (`secret_scanning_push_protection: disabled` on 2026-10-05). Enable
+  in Settings → Code security → Secret Protection → Push protection.
 
 **Settings → Actions → General:**
 - [x] Actions enabled, all actions allowed (as today)
 - [x] Workflow permissions: **read repository contents** (the default token is read-only; jobs that need more
   request it)
 - [x] "Allow GitHub Actions to create and approve pull requests": **off**
-- [ ] Fork pull request workflows: **Require approval for first-time contributors** (the GitHub default for
-  public repos; confirm)
+- [x] Fork pull request workflows: **Require approval for first-time contributors** (confirmed:
+  `approval_policy: first_time_contributors`)
 
 **Settings → General:**
-- [ ] Description: "Dock controls, commands and events for OBS Lua scripts"
-- [ ] Website: the OBS forum resource page (after it's posted)
-- [ ] Topics: `obs-studio`, `obs-plugin`, `lua`, `obs-websocket`, `streaming`
+- [x] Description set: "Lets OBS Lua scripts register commands, publish state, add dock controls and talk to
+  each other and to obs-websocket."
+- [ ] Website: the OBS forum resource page (after it's posted). It currently points to the maintainer's OBS
+  forum profile; switch it once the resource page exists.
+- [x] Topics: `lua`, `obs-plugin`, `obs-studio`, `obs-websocket`, `streaming`
 - [x] Issues on, wiki off, discussions off (as today)
 - [x] Issue templates: `.github/ISSUE_TEMPLATE/`. The bug report asks for the OBS version, OS, plugin version,
   install method, steps and the log.
@@ -105,12 +116,15 @@ the switch.
 
   Verified on the test OBS on 2026-10-05.
 - [x] `CHANGELOG.md` has the `0.9.0-beta1` entry, and `docs/RELEASING.md` describes the steps
-- [ ] **(maintainer)** The M7 PR merged, with CI green on `master`
+- [x] **(maintainer)** The M7 PR merged, with CI green on `master` (`c17700a`, and every `master` push since,
+  up to `ddc4537`)
 
 ## 5. Go / no-go: in this order, all decisions by the maintainer
 1. [ ] Sections 1–4 done; nothing committed since the scan, or the scan re-run
-2. [ ] **Make the repository public** (Settings → General → Danger Zone → Change visibility)
-3. [ ] Apply section 3's settings: the ruleset, private vulnerability reporting, Dependabot alerts
+2. [x] **Make the repository public** (Settings → General → Danger Zone → Change visibility). Confirmed
+   without a token: `visibility: public`.
+3. [x] Apply section 3's settings: the ruleset, private vulnerability reporting, Dependabot alerts. Still open in
+   section 3: push protection, and the website link.
 4. [ ] **Tag `0.9.0-beta1`** on `master` and push it (`docs/RELEASING.md`). CI creates the draft pre-release.
 5. [ ] Check the draft: install the Windows zip and see `version 0.9.0-beta1` in the log; the files are all there
 6. [ ] Publish the release
