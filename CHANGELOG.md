@@ -6,6 +6,15 @@ All notable changes to Lua Bridge for OBS. Versions follow
 
 ## Unreleased: 0.9.0 (first public beta)
 
+### Added since M6
+- **New example `lua/examples/ping-pong/`:** two scripts talking through the bridge. `ping.lua` sends commands, and
+  `pong.lua` answers with events matched by the ping number. It handles pong being missing or reloaded, and
+  avoids command loops.
+- **Docs:** `run_command` from Lua is fire-and-forget; replies come back as events.
+
+### Ideas for v1.1 (not implemented)
+- A Lua request/reply helper, or a read-only `get_state(owner)` procedure, for script-to-script replies.
+
 ### Plugin
 - **Script API** (`api_version` 1):
   - procedures: `luabridge_get_info`, `register`, `unregister`, `set_state`, `emit`, `heartbeat`, `run_command`;

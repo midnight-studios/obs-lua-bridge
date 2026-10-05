@@ -48,6 +48,8 @@ local EXAMPLES = {
 			{ "away_minus", "{}" }, { "reset", "{}" }, { "nope", "{}" },
 		},
 	},
+	["ping-pong/ping.lua"] = { owner = "ping", commands = { { "send", "{}" }, { "send", "{}" }, { "nope", "{}" } } },
+	["ping-pong/pong.lua"] = { owner = "pong", commands = { { "ping", '{"n":1}' }, { "ping", "{}" }, { "nope", "{}" } } },
 }
 
 local function fire_timers(fake)
@@ -113,6 +115,97 @@ function tests.incompatible_plugin_warns_once(fake, _, load_example)
 	exercise(fake, EXAMPLES["stopwatch-demo.lua"])
 	eq(#fake.warnings(), 1, "one warning")
 	contains(fake.warnings()[1].msg, "update the Lua Bridge plugin")
+end
+
+---------------------------------------------------------------------------
+-- Ping-pong: commands one way, events back, no loops
+---------------------------------------------------------------------------
+
+-- The decoded JSON of every set_state / emit call for owner, in order
+local function sent(fake, load_helper, proc, owner)
+	local json = load_helper().json
+	local found = {}
+	for _, c in ipairs(fake.calls_to(proc)) do
+		if c.args.owner == owner then
+			found[#found + 1] = { event = c.args.event, data = json.decode(c.args.json) }
+		end
+	end
+	return found
+end
+
+-- The value of key in owner's state after all set_state calls so far
+local function state(fake, load_helper, owner, key)
+	local value
+	for _, s in ipairs(sent(fake, load_helper, "luabridge_set_state", owner)) do
+		if s.data[key] ~= nil then
+			value = s.data[key]
+		end
+	end
+	return value
+end
+
+function tests.pong_answers_with_an_event_never_a_command(fake, load_helper, load_example)
+	load_example("ping-pong/pong.lua")
+	script_load(obslua.obs_data_create())
+	fake.calls = {}
+	fake.send_command("pong", "ping", '{"n":3}', "script")
+	local events = sent(fake, load_helper, "luabridge_emit", "pong")
+	eq(#events, 1, "one event")
+	eq(events[1].event, "ponged")
+	eq(events[1].data.n, 3, "n")
+	eq(events[1].data.reply, "pong", "reply")
+	eq(type(events[1].data.at), "number", "at")
+	eq(state(fake, load_helper, "pong", "count"), 1, "count")
+	eq(state(fake, load_helper, "pong", "pongs"), "Pongs: 1")
+	eq(#fake.calls_to("luabridge_run_command"), 0, "pong never sends a command (no ping-pong loop)")
+	no_warnings(fake, "pong")
+	script_unload()
+end
+
+function tests.ping_without_pong_shows_pong_not_loaded(fake, load_helper, load_example)
+	load_example("ping-pong/ping.lua")
+	script_load(obslua.obs_data_create())
+	for _ = 1, 3 do
+		fake.send_command("ping", "send", "{}", "dock") -- pong isn't registered
+	end
+	eq(state(fake, load_helper, "ping", "result"), "pong not loaded")
+	eq(state(fake, load_helper, "ping", "next_label"), "Send ping #1", "the number isn't used up")
+	no_warnings(fake, "ping") -- no error, no Script Log warning
+
+	fake.owners.pong = true -- pong is loaded now
+	fake.send_command("ping", "send", "{}", "dock")
+	eq(state(fake, load_helper, "ping", "result"), "Ping #1 sent")
+	eq(state(fake, load_helper, "ping", "next_label"), "Send ping #2", "button caption via label_bind")
+	local pings = fake.calls_to("luabridge_run_command")
+	eq(pings[#pings].args.owner, "pong")
+	eq(pings[#pings].args.command, "ping")
+	contains(pings[#pings].args.json, '"n":1')
+	script_unload()
+end
+
+function tests.ping_shows_ponged_events_and_never_answers_them(fake, load_helper, load_example)
+	load_example("ping-pong/ping.lua")
+	script_load(obslua.obs_data_create())
+	local before = #fake.calls_to("luabridge_run_command")
+	fake.send_event("pong", "ponged", '{"n":7,"reply":"pong","at":0}')
+	contains(state(fake, load_helper, "ping", "last_pong"), 'Last pong: #7 "pong" at ')
+	eq(#fake.calls_to("luabridge_run_command"), before, "no command sent from the event handler")
+
+	-- Other events and other owners are ignored
+	fake.send_event("pong", "something.else", '{"n":8}')
+	fake.send_event("scoreboard", "ponged", '{"n":9}')
+	contains(state(fake, load_helper, "ping", "last_pong"), "#7")
+	no_warnings(fake, "ping")
+	script_unload()
+end
+
+function tests.ping_pong_unload_disconnects_everything(fake, _, load_example)
+	load_example("ping-pong/ping.lua")
+	script_load(obslua.obs_data_create())
+	eq(fake.connections.luabridge_event ~= nil, true, "listening to events")
+	script_unload()
+	eq(next(fake.connections), nil, "no signal handlers left after unload (safe to reload)")
+	eq(fake.owners.ping, nil, "unregistered")
 end
 
 return tests

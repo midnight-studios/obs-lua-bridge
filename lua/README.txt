@@ -6,12 +6,15 @@ examples/       Ready-to-run example scripts:
                   hello-bridge.lua    the smallest example (a Ping button)
                   scoreboard.lua      a score board with +/- buttons and events
                   stopwatch-demo.lua  a stopwatch controlled from the dock
+                  ping-pong/          two scripts talking to each other
+                                      (load ping.lua and pong.lua; see its README.md)
 
 Try the examples
 ----------------
 In OBS, open Tools > Scripts, click +, and pick a file from the examples
-folder right here. The examples load ../luabridge.lua, so leave them in this
-folder. Their controls appear in Docks > Lua Bridge.
+folder right here. The examples load luabridge.lua from this folder
+(../luabridge.lua, or ../../luabridge.lua for ping-pong), so leave them where
+they are. Their controls appear in Docks > Lua Bridge.
 
 Use the helper in your own script
 ---------------------------------

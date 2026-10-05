@@ -423,6 +423,7 @@ Option (b) is acceptable for a first release if it's stated clearly.
 | Minimum OBS version | Before M1 | 31.0. The dock API needs 30+, and 31 matches the template |
 | Dock model | Before M3 | One shared dock with sections per script (v1.0). Per-script docks in v1.1 if requested |
 | Network access for scripts | After 1.0 | High demand but a security responsibility. Design it separately (allow-list, user consent) |
+| Script-to-script replies | v1.1 idea | Commands are fire-and-forget; replies are events matched by an id (see the ping-pong example). Consider a Lua request/reply helper, or a read-only `get_state(owner)` procedure. Additive, so `api_version` stays 1 |
 | Upstreaming | After adoption | Share usage evidence with the OBS team once several third-party scripts use the bridge |
 | OBS updates breaking the build | Ongoing | CI on every OBS release. The small API surface keeps fixes cheap |
 
