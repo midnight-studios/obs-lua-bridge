@@ -15,7 +15,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build C++ Unit Tests 🧱
         run: |
@@ -31,7 +31,7 @@ jobs:
       # Not on macOS: lupa's Apple Silicon wheel has no LuaJIT 2.1 runtime, and
       # the runner refuses to fall back to another Lua. The Lua code is pure Lua
       # on the same LuaJIT, so Ubuntu and Windows cover it.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         if: runner.os != 'macOS'
         with:
           python-version: '3.12'
