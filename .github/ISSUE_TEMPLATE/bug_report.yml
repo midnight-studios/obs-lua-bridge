@@ -1,0 +1,74 @@
+name: Bug report
+description: Something in Lua Bridge doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! For a **security** problem, don't open an issue; see [SECURITY.md](https://github.com/midnight-studios/obs-lua-bridge/blob/master/SECURITY.md).
+  - type: input
+    id: obs-version
+    attributes:
+      label: OBS Studio version
+      description: Help → About, or the first lines of the OBS log.
+      placeholder: "32.2.2"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: "Windows 11 24H2 / macOS 15.4 (Apple Silicon) / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Lua Bridge version
+      description: From the OBS log line `[lua-bridge] plugin loaded successfully (version …)`.
+      placeholder: "0.9.0-beta1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install it?
+      options:
+        - Windows zip
+        - macOS .pkg
+        - macOS .tar.xz
+        - Ubuntu .deb
+        - Linux .tar.xz
+        - Built from source
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Which scripts were loaded (an example, or your own script; a minimal script helps a lot), and what you clicked or sent.
+      placeholder: |
+        1. Load lua/examples/scoreboard.lua
+        2. Click Reset in the dock
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: log
+    attributes:
+      label: OBS log
+      description: In OBS, Help → Log Files → Upload Current Log File, then paste the link here. Or attach the log file below.
+      placeholder: "https://obsproject.com/logs/..."
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Script Log output (Tools → Scripts → Script Log), screenshots, the websocket tool you used.

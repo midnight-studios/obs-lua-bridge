@@ -33,6 +33,9 @@ logging.getLogger("obsws_python").setLevel(logging.CRITICAL)
 
 VENDOR = "LuaBridge"
 OWNER = "wstest"
+BUILDSPEC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "buildspec.json")
+with open(BUILDSPEC, encoding="utf-8") as _f:
+    BUILDSPEC_VERSION = json.load(_f)["version"]  # what GetInfo must report
 HOST = os.environ.get("OBS_WS_HOST", "localhost")
 PORT = int(os.environ.get("OBS_WS_PORT", "4455"))
 PASSWORD = os.environ.get("OBS_WS_PASSWORD", "")
@@ -177,7 +180,11 @@ class VendorTests(unittest.TestCase):
         self.assertEqual(info["api_version"], 1)
         self.assertIs(info["capabilities"]["websocket"], True)
         self.assertIs(info["capabilities"]["run_command"], True)
-        self.assertTrue(info["plugin_version"])
+        # The full version from buildspec.json, pre-release suffix included
+        # ("0.9.0-beta1"); api_version is a separate integer
+        self.assertRegex(info["plugin_version"], r"^\d+\.\d+\.\d+(-[0-9A-Za-z]+)?$")
+        self.assertEqual(info["plugin_version"], BUILDSPEC_VERSION, "the deployed plugin isn't the current build")
+        self.assertIsInstance(info["api_version"], int)
         self.assertTrue(info["obs_version"])
 
     # 2
