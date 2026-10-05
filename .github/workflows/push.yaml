@@ -72,10 +72,11 @@ jobs:
           : Check Tag Matches buildspec.json 🔢
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
 
-          # 1.2.3 and 1.2.3-beta1 both need "version": "1.2.3" in buildspec.json
-          tag_version="${GITHUB_REF_NAME%%-*}"
+          # The tag must equal buildspec.json's version exactly: tag 1.2.3 needs
+          # "version": "1.2.3", tag 1.2.3-beta1 needs "version": "1.2.3-beta1"
+          # (the plugin reports and the packages are named with that version)
           spec_version="$(jq -r '.version' source/buildspec.json)"
-          if [[ "${tag_version}" != "${spec_version}" ]]; then
+          if [[ "${GITHUB_REF_NAME}" != "${spec_version}" ]]; then
             echo "::error::Tag ${GITHUB_REF_NAME} does not match buildspec.json version ${spec_version}"
             exit 1
           fi

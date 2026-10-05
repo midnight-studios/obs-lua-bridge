@@ -4,16 +4,19 @@ All notable changes to Lua Bridge for OBS. Versions follow
 [semantic versioning](https://semver.org/); the script API has its own
 `api_version` (currently 1), see `docs/API.md`.
 
-## Unreleased: 0.9.0 (first public beta)
-
-### Added since M6
-- **New example `lua/examples/ping-pong/`:** two scripts talking through the bridge. `ping.lua` sends commands, and
-  `pong.lua` answers with events matched by the ping number. It handles pong being missing or reloaded, and
-  avoids command loops.
-- **Docs:** `run_command` from Lua is fire-and-forget; replies come back as events.
+## Unreleased
+Nothing yet.
 
 ### Ideas for v1.1 (not implemented)
 - A Lua request/reply helper, or a read-only `get_state(owner)` procedure, for script-to-script replies.
+- macOS signing and notarization.
+
+## 0.9.0-beta1 (first public beta; date set when tagged)
+**Requires OBS Studio 31.1 or newer.**
+- **Platforms:** Windows x64, macOS universal (unsigned community build), Ubuntu 24.04 x86_64. Other Linux
+  distributions via the tarball.
+- **Version:** the plugin reports `0.9.0-beta1` (`luabridge_get_info`, websocket `GetInfo`, OBS log). The
+  script API is `api_version` 1.
 
 ### Plugin
 - **Script API** (`api_version` 1):
@@ -34,23 +37,30 @@ All notable changes to Lua Bridge for OBS. Versions follow
 ### Lua helper (`lua/luabridge.lua`, helper version 1.0.0) and examples
 - **The helper:** JSON, heartbeats, re-registration after removal, and a silent fallback when the plugin isn't
   installed. It never logs a warning in normal use.
-- **Examples:** `hello-bridge.lua`, `scoreboard.lua`, `stopwatch-demo.lua`. The examples have an optional
-  Instance ID for running several copies.
+- **Examples:**
+  - `hello-bridge.lua`, `scoreboard.lua` and `stopwatch-demo.lua`, with an optional Instance ID for running
+    several copies;
+  - `ping-pong/` (`ping.lua` + `pong.lua`): two scripts talking through the bridge, with commands one way and
+    events back, matched by the ping number.
+- **Docs:** `run_command` from Lua is fire-and-forget; replies come back as events.
 - **License:** `lua/` is MIT, so the helper can be copied into scripts under any license. The plugin is
   GPL-2.0-or-later.
 
-### Packaging and CI
+### Packaging, CI and docs
 - **Packages:**
   - Windows zip;
-  - macOS `.pkg` and `.tar.xz` (unsigned community build);
+  - macOS `.pkg` (installs for the current user) and `.tar.xz`;
   - Ubuntu `.deb` and `.tar.xz`;
-  - a Lua-only zip.
+  - a Lua-only zip;
+  - the source tarball.
 
   Every package ships `lua/` (helper, examples, README) and the license files.
 - **Unit tests in CI:** the C++ tests on Windows, macOS and Ubuntu; the Lua tests on Windows and Ubuntu.
-- **Releases:** a version tag creates a draft GitHub release.
-- **OBS canary:** a weekly build against the newest OBS release.
+- **Releases:** a version tag creates a draft GitHub release. The tag must equal `buildspec.json`'s version.
+- **OBS canary:** a weekly build against the newest OBS release, plus Dependabot for GitHub Actions.
+- **Docs:** README for users, `docs/INSTALL.md`, control-surface research
+  (`docs/integrations/control-surfaces.md`), `CONTRIBUTING.md`, `SECURITY.md`, issue templates.
 
 ### Development milestones
 M0 setup · M1 core API · M2 obs-websocket vendor · M3 dock · M4 helper and examples · M5 hardening ·
-M6 packaging and CI.
+M6 packaging and CI · ping-pong example · M7 launch prep.

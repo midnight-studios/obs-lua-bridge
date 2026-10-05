@@ -55,14 +55,22 @@ string(JSON _bundleId GET ${buildspec} platformConfig macos bundleId)
 set(PLUGIN_AUTHOR ${_author})
 set(PLUGIN_WEBSITE ${_website})
 set(PLUGIN_EMAIL ${_email})
-set(PLUGIN_VERSION ${_version})
 set(MACOS_BUNDLEID ${_bundleId})
 
-string(REPLACE "." ";" _version_canonical "${_version}")
-list(GET _version_canonical 0 PLUGIN_VERSION_MAJOR)
-list(GET _version_canonical 1 PLUGIN_VERSION_MINOR)
-list(GET _version_canonical 2 PLUGIN_VERSION_PATCH)
-unset(_version_canonical)
+# The version may carry a pre-release suffix ("0.9.0-beta1"). PLUGIN_VERSION is
+# the full string: what the plugin reports, and the package names. project(),
+# the Windows version resource and the macOS bundle version only accept
+# numbers, so _version (used by project()) and the MAJOR/MINOR/PATCH parts are
+# the numeric "0.9.0".
+if(NOT _version MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)(-[0-9A-Za-z]+)?$")
+  message(FATAL_ERROR "buildspec.json version '${_version}' must be X.Y.Z or X.Y.Z-<suffix> (e.g. 0.9.0-beta1)")
+endif()
+set(PLUGIN_VERSION ${_version})
+set(PLUGIN_VERSION_MAJOR ${CMAKE_MATCH_1})
+set(PLUGIN_VERSION_MINOR ${CMAKE_MATCH_2})
+set(PLUGIN_VERSION_PATCH ${CMAKE_MATCH_3})
+set(_version "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+set(PLUGIN_VERSION_NUMERIC ${_version})
 
 include(buildnumber)
 include(osconfig)

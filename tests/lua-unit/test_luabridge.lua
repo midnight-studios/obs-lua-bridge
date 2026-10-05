@@ -162,6 +162,20 @@ function tests.version_constants(_, load)
 	eq(bridge.API_VERSION, 1)
 end
 
+-- The plugin version is text that may carry a pre-release suffix; only the
+-- integer api_version decides compatibility
+function tests.prerelease_plugin_version_is_fine(fake, load)
+	for _, version in ipairs({ "0.9.0-beta1", "1.0.0-rc2", "1.0.0", "2.3.4-beta10" }) do
+		fake.plugin_version = version
+		fake.logs = {}
+		local bridge = load()
+		eq(bridge.available(), true, "available with plugin_version " .. version)
+		eq(bridge.info().plugin_version, version, "plugin_version passed through as text")
+		eq(type(bridge.info().api_version), "number", "api_version stays an integer")
+		eq(#fake.logs, 0, "nothing logged for " .. version)
+	end
+end
+
 function tests.plugin_absent_falls_back_cleanly(fake, load)
 	fake.present = false
 	local bridge = load()

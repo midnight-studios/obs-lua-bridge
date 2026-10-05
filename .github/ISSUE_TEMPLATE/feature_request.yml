@@ -1,0 +1,20 @@
+name: Feature request
+description: An idea for the plugin, the Lua helper, the dock or the websocket API
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The task or script you're working on, and what's missing today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Lua Bridge help?
+      description: A sketch of the API, dock control or websocket request you have in mind, if any.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you tried instead?

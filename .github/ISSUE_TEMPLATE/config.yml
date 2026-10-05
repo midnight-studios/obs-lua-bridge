@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Install help
+    url: https://github.com/midnight-studios/obs-lua-bridge/blob/master/docs/INSTALL.md
+    about: Install and uninstall steps for Windows, macOS and Linux.
+  - name: Script API documentation
+    url: https://github.com/midnight-studios/obs-lua-bridge/blob/master/docs/API.md
+    about: Procedures, signals, dock controls, the Lua helper and the websocket requests.
+  - name: Report a security vulnerability
+    url: https://github.com/midnight-studios/obs-lua-bridge/security/advisories/new
+    about: Please report security problems privately, not as issues.

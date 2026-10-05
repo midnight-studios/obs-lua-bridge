@@ -41,7 +41,9 @@ so macOS asks you to confirm it once.
 3. macOS says it "cannot verify" the package. Click **Done** (not "Move to Trash").
 4. Open **System Settings → Privacy & Security**, scroll down to the message about
    `obs-lua-bridge-…pkg`, and click **Open Anyway**. Confirm with your password,
-   then follow the installer.
+   then follow the installer. It installs for your user only, into
+   `~/Library/Application Support/obs-studio/plugins/`, which is where OBS looks
+   for plugins.
 5. Start OBS.
 
 **Without the installer (`.tar.xz`):**
@@ -54,13 +56,14 @@ so macOS asks you to confirm it once.
 4. Start OBS.
 
 The `lua/` folder is inside the plugin bundle, at
-`obs-lua-bridge.plugin/Contents/Resources/lua/`. In Finder, right-click the
-plugin → **Show Package Contents**. In the Scripts dialog's file picker, press
-**Cmd+Shift+.** to see hidden folders, or use the Lua-only zip instead.
+`~/Library/Application Support/obs-studio/plugins/obs-lua-bridge.plugin/Contents/Resources/lua/`.
+In the Scripts dialog's file picker, press **Cmd+Shift+G** and paste that path. In
+Finder, right-click the plugin → **Show Package Contents**. Or use the Lua-only zip
+instead.
 
 **Uninstall:** close OBS and delete `obs-lua-bridge.plugin` from
-`/Library/Application Support/obs-studio/plugins/` (installed with the `.pkg`) or
-`~/Library/Application Support/obs-studio/plugins/` (installed by hand).
+`~/Library/Application Support/obs-studio/plugins/`. The `.pkg` and the manual
+install both put it there.
 
 ## Linux
 **Ubuntu 24.04 (x86_64), `.deb`:**

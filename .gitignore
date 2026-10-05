@@ -26,6 +26,8 @@
 !CLAUDE.md
 !CHANGELOG.md
 !THIRD-PARTY-NOTICES.md
+!CONTRIBUTING.md
+!SECURITY.md
 
 # Exclude lock files
 *.lock.json
