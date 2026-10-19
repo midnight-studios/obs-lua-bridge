@@ -110,7 +110,7 @@ local function cleanup()
 end
 
 function script_description()
-	return "Lua Bridge for OBS: procedure fuzzer (testing only). Results go to the script log."
+	return "Lua Bridge: procedure fuzzer (testing only). Results go to the script log."
 end
 
 function script_load(settings)

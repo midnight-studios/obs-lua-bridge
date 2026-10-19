@@ -1,8 +1,12 @@
-<!-- DRAFT: not posted. Text for the OBS forum resource page. Replace the {{placeholders}} at launch. -->
+<!-- DRAFT: not posted. Text for the OBS forum resource page. Replace the {{placeholders}} at launch.
+     The OBS Forum resource policy (docs/POLICY-CHECK.md) requires the statement under the title, the AI usage
+     section, the bug-report steps and the source link; keep them. No OBS logos in the resource's images. -->
 
-# Lua Bridge for OBS: a dock, commands and events for your Lua scripts
+# Lua Bridge: a dock, commands and events for your Lua scripts
 
-**Beta: 0.9.0-beta1.** Lua Bridge works, has been tested hard (see below), and its script API is meant to stay
+Lua Bridge is an independent plugin for OBS Studio and not a product of the OBS Project.
+
+**Beta: 0.9.0-beta2.** Lua Bridge works, has been tested hard (see below), and its script API is meant to stay
 stable. It's a beta because it needs more people, platforms and real scripts. Please report anything odd on
 {{GitHub issues link}}.
 
@@ -65,22 +69,30 @@ commands.
 - **This is the first public release.** The script API (`api_version` 1) is intended to stay compatible, with
   changes in 1.x additive only, but small behaviour changes may still happen before 1.0.
 - **The macOS build isn't signed or notarized** during the beta.
-- **Please report problems** with your OBS version, OS, the plugin version from the log, and the log file.
+- **Please report problems** on {{GitHub issues link}}, not to the OBS Project.
+
+## Reporting bugs
+Open an issue on {{GitHub issues link}} and include:
+- your OBS version (Help → About) and operating system;
+- the Lua Bridge version, from the log line `[lua-bridge] plugin loaded successfully (version …)`;
+- your OBS log: Help → Log Files → Upload Current Log File, and paste the link;
+- what you did, what happened, and which scripts were loaded.
 
 ## Mac testers wanted
 We don't have a Mac to test on. If you do, please:
 1. install the `.pkg` (with the Open Anyway step) and start OBS;
-2. check that **Docks → Lua Bridge** appears and that the log says `[lua-bridge] plugin loaded successfully (version 0.9.0-beta1)`;
+2. check that **Docks → Lua Bridge** appears and that the log says `[lua-bridge] plugin loaded successfully (version 0.9.0-beta2)`;
 3. load `hello-bridge.lua` and click **Ping**;
 4. tell us how it went, including your macOS version and chip (Apple Silicon or Intel), in {{issue or forum thread link}}.
 
 Even a "works for me" helps.
 
 ## Credits
-- **Lua Bridge for OBS:** Midnight Studios.
+- **Lua Bridge:** Midnight Studios.
 - **Thanks to Exeldro** for the original idea.
 - **Built with** the OBS plugin template, obs-websocket's vendor API and nlohmann/json.
 
 ## Source and license
 - **Plugin:** open source (GPL-2.0-or-later). The Lua helper and examples are MIT.
-- **Source, documentation and issues:** {{GitHub repository link}}.
+- **Source, documentation and issues:** {{GitHub repository link}}. Every release also attaches the complete
+  source (`obs-lua-bridge-<version>-source.tar.xz`).

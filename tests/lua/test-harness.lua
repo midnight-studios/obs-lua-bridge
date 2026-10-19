@@ -1,4 +1,4 @@
--- test-harness.lua: in-OBS smoke test for Lua Bridge for OBS
+-- test-harness.lua: in-OBS smoke test for Lua Bridge
 --
 -- Load in Tools > Scripts. Runs synchronous checks at load, then checks the
 -- signals it received 2 seconds later and prints a final RESULT line to the
@@ -204,7 +204,7 @@ local function check_signals()
 end
 
 function script_description()
-	return "Lua Bridge for OBS: in-OBS smoke test. Results (PASS/FAIL and a final RESULT line) go to the script log."
+	return "Lua Bridge: in-OBS smoke test. Results (PASS/FAIL and a final RESULT line) go to the script log."
 end
 
 function script_load(settings)

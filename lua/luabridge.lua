@@ -1,4 +1,4 @@
--- luabridge.lua: helper library for Lua Bridge for OBS
+-- luabridge.lua: helper library for Lua Bridge
 -- https://github.com/midnight-studios/obs-lua-bridge
 --
 -- SPDX-License-Identifier: MIT

@@ -1,5 +1,5 @@
 /*
-Lua Bridge for OBS
+Lua Bridge
 Copyright (C) 2026 Midnight Studios
 
 This program is free software; you can redistribute it and/or modify
@@ -92,6 +92,19 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 }
 
 } // namespace
+
+// Shown in OBS's Plugin Manager; without these it shows the file name. Not
+// translated: it's the product name. The module's identity (config path,
+// enabled state) stays the file name, obs-lua-bridge.
+const char *obs_module_name(void)
+{
+	return "Lua Bridge";
+}
+
+const char *obs_module_description(void)
+{
+	return "A dock, commands and events for Lua scripts. An independent plugin, not a product of the OBS Project.";
+}
 
 bool obs_module_load(void)
 {

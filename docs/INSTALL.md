@@ -1,7 +1,13 @@
-# Installing Lua Bridge for OBS
+# Installing Lua Bridge
+
+Lua Bridge is an independent plugin for OBS Studio and not a product of the OBS
+Project. For problems, [open an issue](https://github.com/midnight-studios/obs-lua-bridge/issues/new/choose)
+here, not with the OBS Project.
 
 Requires **OBS Studio 31.1 or newer**. Download the package for your system from
 the [Releases](https://github.com/midnight-studios/obs-lua-bridge/releases) page.
+On OBS 33, the Plugin Manager labels Lua Bridge "Legacy"; it still works (see the
+[FAQ](#faq)).
 
 Every package includes the plugin, the Lua helper `luabridge.lua` and the
 example scripts, in a `lua/` folder:
@@ -96,7 +102,9 @@ Files**) contains `[lua-bridge] plugin loaded successfully`.
 ## FAQ
 **The dock doesn't show up.** New plugin docks start hidden: turn it on in **Docks → Lua Bridge**.
 
-**OBS 33's Plugin Manager shows Lua Bridge as "Legacy".** On OBS 33+, the Plugin Manager may show Lua Bridge as
-"Legacy". It still works; this is OBS's new plugin layout. Lua Bridge will move to the new layout once the
-official plugin template does, without breaking OBS 31.1–32.
+**OBS 33's Plugin Manager shows Lua Bridge as "Legacy".** OBS 33 introduces a new install layout for plugins
+and flags plugins in the current layout as "Legacy", with a note that the location will stop working in the
+future. Lua Bridge uses the current layout, the one the official OBS plugin template installs, so it shows as
+Legacy. **It still loads and works.** Lua Bridge will move to the new layout once the official plugin template
+supports it, without breaking OBS 31.1–32.
 ([Tracking issue](https://github.com/midnight-studios/obs-lua-bridge/issues/6))

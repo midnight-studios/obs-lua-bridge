@@ -1,17 +1,31 @@
 # Changelog
 
-All notable changes to Lua Bridge for OBS. Versions follow
+All notable changes to Lua Bridge. Versions follow
 [semantic versioning](https://semver.org/); the script API has its own
 `api_version` (currently 1), see `docs/API.md`.
 
-## Unreleased
-- **Docs:** INSTALL.md has a FAQ: the dock starts hidden (Docks → Lua Bridge), and the "Legacy" label in OBS 33's
-  Plugin Manager.
+## Unreleased: 0.9.0-beta2
+**Requires OBS Studio 31.1 or newer.** No changes to the script API (`api_version` 1), `luabridge.lua` or the
+websocket requests.
 
-### Planned for 0.9.0-beta2
-- Strip the debug symbols (`obs-lua-bridge.plugin.dSYM`) from the macOS `.pkg`. In Release builds the template
-  installs them next to the plugin; they're harmless, but they clutter users' plugin folders and make the
-  installer about 4.8 MB instead of about 0.35 MB.
+### OBS Forum resource policy
+- **Name:** the plugin is now called **Lua Bridge** everywhere users see it (README, docs, package metadata, the
+  example scripts' descriptions, release titles). OBS's Plugin Manager now shows "Lua Bridge" instead of the file
+  name (`obs_module_name`), with a short description. Unchanged, so nothing breaks: the repository and file names
+  (`obs-lua-bridge`), the procedures and signals (`luabridge_*`), the websocket vendor `LuaBridge` and owner IDs.
+- **Docs:** the README and INSTALL.md state that Lua Bridge is an independent plugin and not a product of the
+  OBS Project; the README has bug-report instructions; `docs/POLICY-CHECK.md` maps
+  each policy point to where the repository meets it.
+
+### Packaging
+- **macOS:** the `.pkg` no longer installs debug symbols (`obs-lua-bridge.plugin.dSYM`) next to the plugin, which
+  makes the installer about 0.35 MB instead of about 4.8 MB. Packaging now fails if a `.pkg` contains a `.dSYM`.
+  The symbols are still built, as a separate CI artifact.
+- **Ubuntu:** the `.deb` has a real description and a homepage instead of CPack's default text.
+
+### Docs
+- INSTALL.md has a FAQ: the dock starts hidden (Docks → Lua Bridge), and OBS 33's Plugin Manager labels Lua
+  Bridge "Legacy" (it still works; the README mentions it too).
 
 ### Ideas for v1.1 (not implemented)
 - A Lua request/reply helper, or a read-only `get_state(owner)` procedure, for script-to-script replies.

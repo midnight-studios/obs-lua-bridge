@@ -20,7 +20,7 @@ local OWNER = "ping"
 local sent = 0 -- the number of the last ping pong accepted
 
 function script_description()
-	return "Lua Bridge for OBS: ping-pong example, the asking side. Load pong.lua too."
+	return "Lua Bridge: ping-pong example, the asking side. Load pong.lua too."
 end
 
 -- Sends the next ping to pong and shows what happened

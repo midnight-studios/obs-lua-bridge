@@ -2,7 +2,7 @@
 
 Hi Exeldro,
 
-Thank you for the idea that started this. I've now built it: **Lua Bridge for OBS**, a plugin that gives Lua
+Thank you for the idea that started this. I've now built it: **Lua Bridge**, a plugin that gives Lua
 scripts a shared dock with controls, commands that other scripts and obs-websocket tools can run, and live
 state and custom events. Scripts that use its small helper keep working when the plugin isn't installed.
 

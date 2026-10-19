@@ -1,5 +1,5 @@
-Lua Bridge for OBS: installing on Windows
-=========================================
+Lua Bridge: installing on Windows
+=================================
 
 Requires OBS Studio 31.1 or newer (64-bit).
 

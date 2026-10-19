@@ -91,7 +91,7 @@ local function on_command(cd)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: companion for the websocket tests (tests/websocket/test_vendor.py). Registers owner 'wstest'."
+	return "Lua Bridge: companion for the websocket tests (tests/websocket/test_vendor.py). Registers owner 'wstest'."
 end
 
 function script_load(settings)

@@ -1,4 +1,4 @@
-# Lua Bridge for OBS — project rules
+# Lua Bridge — project rules
 - Spec: docs/SPEC.md (copy of this guide's Parts B, D, E). Do not change the public API
   (procedure/signal names, JSON shapes) without updating docs/API.md and asking first.
 - Language: C++17 for plugin code, Lua 5.1/LuaJIT-compatible for lua/.

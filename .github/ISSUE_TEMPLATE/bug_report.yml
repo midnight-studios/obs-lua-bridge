@@ -26,7 +26,7 @@ body:
     attributes:
       label: Lua Bridge version
       description: From the OBS log line `[lua-bridge] plugin loaded successfully (version …)`.
-      placeholder: "0.9.0-beta1"
+      placeholder: "0.9.0-beta2"
     validations:
       required: true
   - type: dropdown

@@ -16,7 +16,7 @@ local function owner_id(i)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: ten owners for the stress and soak tests (testing only)."
+	return "Lua Bridge: ten owners for the stress and soak tests (testing only)."
 end
 
 function script_load(settings)

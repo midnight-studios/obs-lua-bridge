@@ -1,6 +1,6 @@
 # Third-party notices
 
-Lua Bridge for OBS is licensed under the GNU General Public License, version 2
+Lua Bridge is licensed under the GNU General Public License, version 2
 or later (see `LICENSE`). The Lua helper and example scripts in `lua/` are
 MIT-licensed (see `lua/LICENSE`).
 

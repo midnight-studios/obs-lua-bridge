@@ -21,7 +21,7 @@ local OWNER = "pong"
 local pongs = 0 -- how many pings this script has answered since it was loaded
 
 function script_description()
-	return "Lua Bridge for OBS: ping-pong example, the answering side. Load ping.lua too."
+	return "Lua Bridge: ping-pong example, the answering side. Load ping.lua too."
 end
 
 -- Called for every command sent to "pong" (from ping.lua, the dock, or websocket)

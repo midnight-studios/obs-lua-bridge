@@ -2,7 +2,7 @@
 
 Hi OBS team,
 
-A short heads-up about a plugin we're releasing as a public beta: **Lua Bridge for OBS** ({{GitHub repository link}}).
+A short heads-up about a plugin we're releasing as a public beta: **Lua Bridge** ({{GitHub repository link}}).
 
 **What it is.** It gives Lua scripts things the scripting API doesn't offer today: a shared dock with controls
 (buttons, labels, inputs, toggles), commands that other scripts and obs-websocket clients can run, and

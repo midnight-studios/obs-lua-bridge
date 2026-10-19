@@ -1,4 +1,4 @@
-# Contributing to Lua Bridge for OBS
+# Contributing to Lua Bridge
 
 Thanks for helping! Bug reports and ideas go in
 [issues](https://github.com/midnight-studios/obs-lua-bridge/issues); security problems go through

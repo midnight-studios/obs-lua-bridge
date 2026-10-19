@@ -1,4 +1,4 @@
--- hello-bridge.lua: the smallest Lua Bridge for OBS example
+-- hello-bridge.lua: the smallest Lua Bridge example
 --
 -- SPDX-License-Identifier: MIT
 -- Copyright (c) 2026 Midnight Studios. See lua/LICENSE (MIT); the plugin itself is GPL-2.0-or-later.
@@ -21,7 +21,7 @@ local function log(msg)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: minimal example. Click Ping in the Lua Bridge dock (Docks > Lua Bridge)."
+	return "Lua Bridge: minimal example. Click Ping in the Lua Bridge dock (Docks > Lua Bridge)."
 end
 
 function script_load(settings)

@@ -1,4 +1,4 @@
-# Releasing Lua Bridge for OBS
+# Releasing Lua Bridge
 
 ## Versions
 - **The version lives in one place:** `"version"` in `buildspec.json`, for example `0.9.0-beta1` or `1.0.0`.
@@ -34,23 +34,24 @@
 3. **Tag `master` and push the tag** (the maintainer decides when):
    ```
    git checkout master && git pull
-   git tag -a 0.9.0-beta1 -m "Lua Bridge for OBS 0.9.0-beta1"
-   git push origin 0.9.0-beta1
+   git tag -a 0.9.0-beta2 -m "Lua Bridge 0.9.0-beta2"
+   git push origin 0.9.0-beta2
    ```
 4. **CI** (`push.yaml`) builds Release packages for Windows, macOS and Ubuntu, runs the unit tests, checks the
-   tag against `buildspec.json`, and creates a **draft** GitHub release. For `0.9.0-beta1` the attachments are:
-   - `obs-lua-bridge-0.9.0-beta1-windows-x64.zip`;
-   - `obs-lua-bridge-0.9.0-beta1-macos-universal.pkg` and `obs-lua-bridge-0.9.0-beta1-macos-universal.tar.xz`
+   tag against `buildspec.json`, and creates a **draft** GitHub release. For `0.9.0-beta2` the attachments are:
+   - `obs-lua-bridge-0.9.0-beta2-windows-x64.zip`;
+   - `obs-lua-bridge-0.9.0-beta2-macos-universal.pkg` and `obs-lua-bridge-0.9.0-beta2-macos-universal.tar.xz`
      (unsigned community build);
-   - `obs-lua-bridge-0.9.0-beta1-x86_64-linux-gnu.deb` (+ `…-dbgsym.ddeb` debug symbols) and
-     `obs-lua-bridge-0.9.0-beta1-x86_64-ubuntu-gnu.tar.xz`;
-   - `obs-lua-bridge-0.9.0-beta1-source.tar.xz`: the complete source, which the GPL requires us to offer;
-   - `obs-lua-bridge-lua-0.9.0-beta1.zip`: only the Lua helper and examples;
+   - `obs-lua-bridge-0.9.0-beta2-x86_64-linux-gnu.deb` (+ `…-dbgsym.ddeb` debug symbols) and
+     `obs-lua-bridge-0.9.0-beta2-x86_64-ubuntu-gnu.tar.xz`;
+   - `obs-lua-bridge-0.9.0-beta2-source.tar.xz`: the complete source, which the GPL requires us to offer;
+   - `obs-lua-bridge-lua-0.9.0-beta2.zip`: only the Lua helper and examples;
    - checksums in the release text.
 5. **Check the draft:**
    - download the Windows zip and install it as `docs/INSTALL.md` says;
-   - start OBS and check that the log says `version 0.9.0-beta1` and that the dock appears.
-6. **Write the release text:**
+   - start OBS and check that the log says `version 0.9.0-beta2` and that the dock appears.
+6. **Write the release text** from `docs/RELEASE-NOTES-TEMPLATE.md`. Keep its policy statements (not an OBS
+   Project product, AI usage, reporting bugs). It brings together:
    - the CHANGELOG section for this version;
    - for a beta, the beta notice and the "Mac testers wanted" call (`docs/launch/forum-resource.md` has wording);
    - the checksums CI added.
