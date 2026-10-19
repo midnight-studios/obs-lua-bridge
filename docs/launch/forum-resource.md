@@ -1,7 +1,8 @@
-<!-- DRAFT: not posted. Text for the OBS forum resource page. Replace the {{placeholders}} at launch.
-     The OBS Forum resource policy (docs/POLICY-CHECK.md) requires the statement under the title, the AI usage
-     section, the bug-report steps and the source link; keep them. No OBS logos in the resource's images.
-     Policy rule I4: the maintainer writes the posted description in their own words; this draft is a checklist. -->
+<!-- UNUSED CHECKLIST, NOT A POST. Lua Bridge is not submitted to the OBS forum: it is published on GitHub
+     only, because it doesn't meet the forum policy's rule on AI-written resources (S5 in docs/POLICY-CHECK.md).
+     This file records what a forum resource page would have to contain (the statement under the title, the AI
+     usage section, the bug-report steps, the source link; no OBS logos). If that ever changes, the maintainer
+     writes the description in their own words (rule I4) and uses this only as a checklist. -->
 
 # Lua Bridge: a dock, commands and events for your Lua scripts
 
