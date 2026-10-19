@@ -10,6 +10,8 @@ Backs up <config>/basic, then (idempotently):
     with instance ID x) for duplicates.py;
   * creates "LuaBridge Fuzz" (fuzz-harness.lua), and "LuaBridge PingPong" /
     "LuaBridge Ping Only" (the ping-pong example) for test_ping_pong.py;
+  * creates "LuaBridge Docks" (ws-companion, stopwatch-demo, ping, pong, dock-test) and
+    "LuaBridge Empty" (no scripts) for tests/ui/script_docks.ps1;
   * creates the profile "LuaBridge P2" as a copy of "Untitled".
 Only C:/obs-test (or OBS_ROOT) is touched.
 
@@ -115,6 +117,15 @@ def main():
         script(ROOT / "tests/websocket/ws-companion.lua"),
         script(ping_pong / "ping.lua"),
     ])
+    # Script docks (tests/ui/script_docks.ps1): the stopwatch demo, the ping-pong pair and dock-test
+    write_collection(base, "LuaBridge Docks", "LuaBridge_Docks.json", [
+        script(ROOT / "tests/websocket/ws-companion.lua"),
+        script(ROOT / "lua/examples/stopwatch-demo.lua"),
+        script(ping_pong / "ping.lua"),
+        script(ping_pong / "pong.lua"),
+        script(ROOT / "tests/lua/dock-test.lua"),
+    ])
+    write_collection(base, "LuaBridge Empty", "LuaBridge_Empty.json", [])
 
     profile = BASIC / "profiles" / "LuaBridge_P2"
     if not profile.exists():

@@ -18,8 +18,10 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 
 #include "dock-events.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <mutex>
+#include <vector>
 
 #include <QMetaObject>
 
@@ -29,17 +31,15 @@ namespace luabridge::dock {
 
 namespace {
 
-// Guards the pointer so a post never races with detach_events()
+// Guards the list so a post never races with detach_events()
 std::mutex dock_mutex;
-LuaBridgeDock *attached = nullptr;
+std::vector<LuaBridgeDock *> attached;
 
-void post(std::function<void(LuaBridgeDock &)> fn)
+void post(const std::function<void(LuaBridgeDock &)> &fn)
 {
 	std::lock_guard lock(dock_mutex);
-	if (!attached)
-		return;
-	LuaBridgeDock *dock = attached;
-	QMetaObject::invokeMethod(dock, [dock, fn = std::move(fn)] { fn(*dock); }, Qt::QueuedConnection);
+	for (LuaBridgeDock *dock : attached)
+		QMetaObject::invokeMethod(dock, [dock, fn] { fn(*dock); }, Qt::QueuedConnection);
 }
 
 class DockEvents final : public EventSink {
@@ -64,13 +64,14 @@ public:
 void attach_events(LuaBridgeDock *dock)
 {
 	std::lock_guard lock(dock_mutex);
-	attached = dock;
+	if (std::find(attached.begin(), attached.end(), dock) == attached.end())
+		attached.push_back(dock);
 }
 
-void detach_events()
+void detach_events(LuaBridgeDock *dock)
 {
 	std::lock_guard lock(dock_mutex);
-	attached = nullptr;
+	attached.erase(std::remove(attached.begin(), attached.end(), dock), attached.end());
 }
 
 EventSink &events()

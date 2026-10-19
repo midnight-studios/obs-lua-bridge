@@ -40,9 +40,19 @@ Python requirements: `py -m pip install obsws-python psutil lupa`.
 
 `py tests/websocket/setup_test_obs.py --backup <dir>` (OBS closed) backs up the
 test OBS's `basic` config, then creates the extra scene collections and the
-profile that the M5 tests use: "LuaBridge B", "LuaBridge Dup",
-"LuaBridge Conflict", "LuaBridge Fuzz" and the profile "LuaBridge P2". It is
-idempotent.
+profile that the tests use: "LuaBridge B", "LuaBridge Dup",
+"LuaBridge Conflict", "LuaBridge Fuzz", "LuaBridge PingPong", "LuaBridge Ping
+Only", "LuaBridge Docks", "LuaBridge Empty" and the profile "LuaBridge P2". It
+is idempotent.
+
+**The script docks test** (`tests/ui/script_docks.ps1`) drives the real OBS
+window through Windows UI Automation: it opens Tools → Lua Bridge, ticks
+**Dock** with the keyboard path (Space), sets titles, moves a dock, restarts
+OBS and checks that the docks come back where they were. Its input goes to OBS
+as UI Automation calls and posted window messages, so it never moves your mouse
+or types into other windows, but a new dock takes the focus when it opens. It
+starts and closes OBS five times, never kills it, and deletes `docks.json` in
+the test OBS before and after.
 
 **Closing the test OBS from a script:** use `tools/close-test-obs.ps1`. It
 sends the same message as the window's close button and never kills OBS. Don't
@@ -61,7 +71,7 @@ the client stops.
 
 | Suite | Command | Needs | Time |
 |---|---|---|---|
-| Core unit tests (registry, events, dock logic, rate limiter, log limiter) | `ctest --test-dir build_x64 -C RelWithDebInfo --output-on-failure` | build only | seconds |
+| Core unit tests (registry, events, dock logic, script docks config, rate limiter, log limiter) | `ctest --test-dir build_x64 -C RelWithDebInfo --output-on-failure` | build only | seconds |
 | Lua helper and example unit tests (LuaJIT 2.1 via lupa); includes "the examples log no warning, with or without the plugin" | `py tests/lua-unit/test_luabridge.py` | nothing | seconds |
 | Raw API and helper harnesses | load `tests/lua/test-harness.lua` and `tests/lua/helper-harness.lua` in Tools > Scripts; each prints `RESULT: n passed, 0 failed` to the log | test OBS | seconds |
 | Dock | `tests/lua/dock-test.lua` | test OBS, a person looking at the dock | 5 min |
@@ -69,6 +79,7 @@ the client stops.
 | Examples | `py tests/websocket/test_examples.py` | `scoreboard.lua`, `stopwatch-demo.lua` loaded | 30 s |
 | Rate limiting | `py tests/websocket/test_rate_limit.py` | `ws-companion.lua`, `hello-bridge.lua` loaded | 15 s |
 | Ping-pong example | `py tests/websocket/test_ping_pong.py`, then `--close` | the "LuaBridge PingPong" and "LuaBridge Ping Only" collections (`setup_test_obs.py`) | 1 min |
+| Script docks (Windows) | `pwsh tests/ui/script_docks.ps1 [-Root C:\obs-test]` (`-Legacy33` for an OBS 33 copy with the plugin in `<Root>\_legacy`) | OBS closed; the "LuaBridge Docks", "LuaBridge B" and "LuaBridge Empty" collections and the "LuaBridge P2" profile (`setup_test_obs.py`) | 5 min |
 
 **Ping-pong checks** (`test_ping_pong.py`). It switches collections by itself and returns to the one it started in.
 1. **ping without pong:**
@@ -137,6 +148,21 @@ These need someone at the OBS window, about 15 minutes in all:
   two separate Score Board sections that don't affect each other.
 - **Confirm dialogs at exit:** open a dock confirm dialog (Score Board → Reset),
   leave it open, and close OBS. OBS must close, and the dialog with it.
+- **Script docks** (about 10 min, in "LuaBridge Docks"; the automated test covers
+  the rest):
+  - **Docked, not floating:** give the Stopwatch a dock, drag it into the main
+    window next to another dock, restart OBS. It's back in the same place and
+    size. (The test checks floating docks and reads positions through Qt; this
+    checks one docked into the window, by eye.)
+  - **Remove in a script dock:** give Dock Test a dock, stop its heartbeat (its
+    script properties in Tools → Scripts), wait about 30 s. Both the script dock
+    and the Lua Bridge dock grey out the section and show **Remove**. Click
+    **Remove** in the script dock: it says the script isn't running and stays
+    in the Docks menu. Resume the heartbeat: the controls come back in both.
+  - **The window:** mouse and keyboard (Space ticks **Dock**, F2 edits the
+    title, Esc cancels an edit), the column widths, and the texts in a light and
+    a dark theme. Ticking a 33rd dock shows the limit message (needs 33 owners;
+    the limit itself is unit-tested).
 - **Ping-pong: reloading and removing pong** (2 min, in "LuaBridge PingPong" with
   the dock open):
   1. Click **Send ping** a few times, then in Tools → Scripts select `pong.lua` →

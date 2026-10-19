@@ -42,22 +42,24 @@ namespace {
 constexpr int stale_check_interval_ms = 1000;
 }
 
-LuaBridgeDock::LuaBridgeDock(Registry &registry, Emitter &emitter, EventSink &events, QWidget *parent)
+LuaBridgeDock::LuaBridgeDock(Registry &registry, Emitter &emitter, EventSink &events, std::string owner,
+			     QWidget *parent)
 	: QWidget(parent),
 	  registry_(registry),
 	  emitter_(emitter),
-	  events_(events)
+	  events_(events),
+	  owner_filter_(std::move(owner))
 {
 	auto *layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
 	stack_ = new QStackedWidget(this);
 	layout->addWidget(stack_);
 
-	auto *placeholder = new QLabel(QString::fromUtf8(obs_module_text("LuaBridge.Dock.Placeholder")), this);
-	placeholder->setWordWrap(true);
-	placeholder->setAlignment(Qt::AlignCenter);
-	placeholder->setContentsMargins(12, 12, 12, 12);
-	stack_->addWidget(placeholder);
+	placeholder_ = new QLabel(this);
+	placeholder_->setWordWrap(true);
+	placeholder_->setAlignment(Qt::AlignCenter);
+	placeholder_->setContentsMargins(12, 12, 12, 12);
+	stack_->addWidget(placeholder_);
 
 	scroll_ = new QScrollArea(this);
 	scroll_->setWidgetResizable(true);
@@ -75,7 +77,19 @@ LuaBridgeDock::LuaBridgeDock(Registry &registry, Emitter &emitter, EventSink &ev
 	connect(stale_timer, &QTimer::timeout, this, [this] { schedule_reconcile(); });
 	stale_timer->start(stale_check_interval_ms);
 
+	update_placeholder();
 	schedule_reconcile();
+}
+
+void LuaBridgeDock::on_display_name(std::function<void(const std::string &)> callback)
+{
+	display_name_callback_ = std::move(callback);
+}
+
+void LuaBridgeDock::set_owner_seen()
+{
+	owner_seen_ = true;
+	update_placeholder();
 }
 
 void LuaBridgeDock::schedule_reconcile()
@@ -95,7 +109,22 @@ void LuaBridgeDock::reconcile()
 	for (const auto &[owner, section] : sections_)
 		shown.push_back({owner, section->generation(), section->stale()});
 
-	dock_logic::SectionPlan plan = dock_logic::plan_sections(shown, registry_.list_owners());
+	std::vector<OwnerSummary> owners = registry_.list_owners();
+	if (!owner_filter_.empty()) {
+		owners.erase(std::remove_if(owners.begin(), owners.end(),
+					    [this](const OwnerSummary &o) { return o.id != owner_filter_; }),
+			     owners.end());
+		if (!owners.empty()) {
+			owner_seen_ = true;
+			if (owners.front().display_name != display_name_) {
+				display_name_ = owners.front().display_name;
+				if (display_name_callback_)
+					display_name_callback_(display_name_);
+			}
+		}
+	}
+
+	dock_logic::SectionPlan plan = dock_logic::plan_sections(shown, owners);
 
 	for (const auto &owner : plan.remove) {
 		OwnerSection *section = sections_[owner];
@@ -176,7 +205,17 @@ void LuaBridgeDock::remove_owner(const std::string &owner)
 
 void LuaBridgeDock::update_placeholder()
 {
-	stack_->setCurrentWidget(sections_.empty() ? stack_->widget(0) : scroll_);
+	if (!sections_.empty()) {
+		stack_->setCurrentWidget(scroll_);
+		return;
+	}
+	// A script dock waits for its script, or says it stopped (unregistered or
+	// removed); the combined dock explains how to add a script
+	const char *key = owner_filter_.empty() ? "LuaBridge.Dock.Placeholder"
+			  : owner_seen_         ? "LuaBridge.ScriptDock.NotRunning"
+						: "LuaBridge.ScriptDock.Waiting";
+	placeholder_->setText(QString::fromUtf8(obs_module_text(key)));
+	stack_->setCurrentWidget(placeholder_);
 }
 
 void LuaBridgeDock::close_dialogs()

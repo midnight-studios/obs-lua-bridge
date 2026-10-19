@@ -334,6 +334,7 @@ Each milestone ends with a **tagged pre-release** (`0.x.0`) so CI produces insta
 - A renderer for the B7 control types. Labels update live from state.
 - Stale owners are shown greyed out. A "no scripts registered" placeholder shows when the dock is empty.
 - **Done when:** The stopwatch example (M4) is fully controllable from the dock, and the dock survives script reload, owner removal, and an OBS restart.
+- **Added in 0.9.0-beta2: per-script docks.** Tools → Lua Bridge opens a window listing the owners; ticking **Dock** gives an owner its own dock (`obs_frontend_add_dock_by_id`, id `luabridge.<owner>`, title = custom title or display name), at most 32. The choice is saved in the module config (`docks.json`, the same for all profiles and collections) and the docks are recreated in `obs_module_load`, because OBS restores dock layouts only once, after modules load; a dock added later opens floating. A script dock shows `waiting for script`, the owner's section, or `script not running`; **Remove** keeps the dock. No change to the script or websocket API.
 
 ### M4 — Lua helper and reference integrations (2 days)
 - **First:** button `label_bind`. A `button` control may name a state key; while that key is set, the button shows its value, and when it's unset (`null`) it shows the command's label again. The Stopwatch's Start/Pause button needs it. Add unit tests, an API.md entry, and a dock-test demo ("Starting…" → "Started ✓").
@@ -421,7 +422,7 @@ Option (b) is acceptable for a first release if it's stated clearly.
 |---|---|---|
 | Plugin name and prefix | Before M0 | Keep `luabridge_` short and unique. Check the forum for name collisions |
 | Minimum OBS version | Before M1 | 31.0. The dock API needs 30+, and 31 matches the template |
-| Dock model | Before M3 | One shared dock with sections per script (v1.0). Per-script docks in v1.1 if requested |
+| Dock model | Before M3 | One shared dock with sections per script (v1.0). **Decided for 0.9.0-beta2:** optional per-script docks, chosen in Tools → Lua Bridge, with the shared dock kept (see M3) |
 | Network access for scripts | After 1.0 | High demand but a security responsibility. Design it separately (allow-list, user consent) |
 | Script-to-script replies | v1.1 idea | Commands are fire-and-forget; replies are events matched by an id (see the ping-pong example). Consider a Lua request/reply helper, or a read-only `get_state(owner)` procedure. Additive, so `api_version` stays 1 |
 | Upstreaming | After adoption | Share usage evidence with the OBS team once several third-party scripts use the bridge |
