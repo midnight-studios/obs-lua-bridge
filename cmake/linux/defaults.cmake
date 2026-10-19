@@ -23,11 +23,12 @@ set(CPACK_GENERATOR "DEB")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${PLUGIN_EMAIL}")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${PLUGIN_WEBSITE}")
-# Without these, the .deb's description is CPack's default "<name> built using CMake"
+# Without these, the .deb's description is CPack's default "<name> built using CMake".
+# CPack puts the summary first (the synopsis), so the long text doesn't repeat it.
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Lua Bridge: a dock, commands and events for OBS Studio Lua scripts")
 set(
   CPACK_DEBIAN_PACKAGE_DESCRIPTION
-  "Lua Bridge: a dock, commands and events for OBS Studio Lua scripts\nLua Bridge gives OBS Lua scripts controls in a dock, commands that other scripts and\nobs-websocket tools can run, and live state and custom events. It is an independent\nplugin and not a product of the OBS Project."
+  "Lua Bridge gives OBS Lua scripts controls in a dock, commands that other scripts and\nobs-websocket tools can run, and live state and custom events. It is an independent\nplugin and not a product of the OBS Project."
 )
 set(CPACK_SET_DESTDIR ON)
 
