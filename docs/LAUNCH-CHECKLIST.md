@@ -113,10 +113,8 @@ Ruleset "protect master" (id 24481055), active, targeting the default branch (`m
 - [x] **Dependabot security updates: enabled.**
 - [x] Dependabot version updates: already configured in `.github/dependabot.yml` (GitHub Actions, monthly)
 - [x] Secret scanning: enabled.
-- [ ] **Push protection: still disabled.** Re-checked on 2026-10-05 after the maintainer reported enabling it:
-  the repository API still says `secret_scanning_push_protection: disabled`, while secret scanning says
-  `enabled`. The setting is per repository, in this repo's Settings → Code security → Secret Protection →
-  Push protection. The personal setting "Push protection for yourself" is a different switch.
+- [x] **Push protection: enabled** at the repository level. Verified 2026-10-05:
+  `secret_scanning_push_protection: enabled`. An earlier check that day still showed it disabled.
 
 **Settings → Actions → General:**
 - [x] Actions enabled, all actions allowed (as today)
@@ -148,14 +146,23 @@ Ruleset "protect master" (id 24481055), active, targeting the default branch (`m
   up to `ddc4537`)
 
 ## 5. Go / no-go: in this order, all decisions by the maintainer
-1. [ ] Sections 1–4 done; nothing committed since the scan, or the scan re-run. **Not ticked:** the re-run found
-   the maintainer's name in the history (section 1), and push protection is still off (section 3).
+1. [x] Sections 1–4 done; nothing committed since the scan, or the scan re-run.
+   - The re-run's finding (the maintainer's name in the history) was accepted by the maintainer: it stays in
+     history, and it's removed from the current file.
+   - Push protection is now enabled.
 2. [x] **Make the repository public** (Settings → General → Danger Zone → Change visibility). Confirmed
    without a token: `visibility: public`.
 3. [x] Apply section 3's settings: the ruleset, private vulnerability reporting, Dependabot alerts. Still open in
-   section 3: push protection, and the website link.
-4. [ ] **Tag `0.9.0-beta1`** on `master` and push it (`docs/RELEASING.md`). CI creates the draft pre-release.
-5. [ ] Check the draft: install the Windows zip and see `version 0.9.0-beta1` in the log; the files are all there
+   section 3: the website link (until the forum resource page exists).
+4. [x] **Tag `0.9.0-beta1`** on `master` and push it (`docs/RELEASING.md`). CI creates the draft pre-release.
+   Done 2026-10-05: annotated tag on `3a85a4b` (noreply tagger). The release run succeeded, and the draft is a
+   pre-release, not set as latest.
+5. [x] Check the draft: install the Windows zip and see `version 0.9.0-beta1` in the log; the files are all there.
+   Done 2026-10-05:
+   - all 8 assets are named `…0.9.0-beta1…`, and their SHA-256 sums match the release text;
+   - the draft's Windows zip was installed in a fresh portable OBS 32.2.2 (via OBS_PLUGINS_PATH, not
+     ProgramData). The log says `version 0.9.0-beta1`; the dock appears via Docks → Lua Bridge; Ping in
+     `hello-bridge` updates its label and logs `ping received`; 0 leaks; uninstalling leaves scripts working.
 6. [ ] Publish the release
 7. [ ] Post the forum resource (`docs/launch/forum-resource.md`), then send the messages to Exeldro and the OBS
    team (`docs/launch/`)
