@@ -1,6 +1,7 @@
 <!-- DRAFT: not posted. Text for the OBS forum resource page. Replace the {{placeholders}} at launch.
      The OBS Forum resource policy (docs/POLICY-CHECK.md) requires the statement under the title, the AI usage
-     section, the bug-report steps and the source link; keep them. No OBS logos in the resource's images. -->
+     section, the bug-report steps and the source link; keep them. No OBS logos in the resource's images.
+     Policy rule I4: the maintainer writes the posted description in their own words; this draft is a checklist. -->
 
 # Lua Bridge: a dock, commands and events for your Lua scripts
 
@@ -35,8 +36,8 @@ to tools like Stream Deck. Lua Bridge adds that:
   - **ping-pong**: two scripts talking to each other.
 - **obs-websocket requests:** `GetInfo`, `ListOwners`, `ListCommands`, `GetState`, `RunCommand`, with
   rate limiting, plus state-change and custom events.
-- **Tested** with fuzzing, a 1-hour stress test (1,000 commands per minute), an 8-hour soak, shutdowns with
-  commands in flight, and scene collection and profile switching.
+- **Tested** before the first beta with fuzzing, a 1-hour stress test (1,000 commands per minute), an 8-hour
+  soak, shutdowns with commands in flight, and scene collection and profile switching (see AI usage).
 
 ## Install
 Download from {{GitHub release link}}:
@@ -66,10 +67,30 @@ commands.
 - **Setup steps:** {{control-surfaces.md#using-a-stream-deck link}}.
 
 ## Beta notice
-- **This is the first public release.** The script API (`api_version` 1) is intended to stay compatible, with
+- **This is a beta.** The script API (`api_version` 1) is intended to stay compatible, with
   changes in 1.x additive only, but small behaviour changes may still happen before 1.0.
 - **The macOS build isn't signed or notarized** during the beta.
 - **Please report problems** on {{GitHub issues link}}, not to the OBS Project.
+
+## AI usage
+Lua Bridge was developed with extensive help from an AI coding assistant, Anthropic's Claude (through Claude
+Code). Every change by a person since the repository was created from the OBS plugin template was made with it;
+those commits carry a `Co-Authored-By: Claude` line.
+- **Design:** the specification and the script API were worked out with Claude. The maintainer set the goals and
+  made the design decisions.
+- **Code:** Claude wrote most of the plugin (C++), the Lua helper and examples, and the build, packaging and CI
+  scripts, following the maintainer's instructions.
+- **Tests:** Claude wrote the unit tests, websocket test suites, fuzzers and stress tests, and ran them against
+  test copies of OBS.
+- **Docs:** Claude drafted most of the documentation; the maintainer edited it.
+
+**The maintainer's role:** the maintainer defined the goals, made every design decision, reviewed every change
+report and pull request before merging, and tested the plugin in OBS on Windows.
+
+**Review and testing:** CI builds on Windows, macOS and Ubuntu and runs the unit tests on every pull request, and
+changes merge only when CI passes. Before the first beta (0.9.0-beta1), the plugin was also tested on Windows
+with fuzzing, a 1-hour stress test, an 8-hour soak, shutdowns with commands in flight, and scene collection and
+profile switching; those runs haven't been repeated for 0.9.0-beta2. It hasn't been tested on a real Mac yet.
 
 ## Reporting bugs
 Open an issue on {{GitHub issues link}} and include:

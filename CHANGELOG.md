@@ -14,8 +14,9 @@ websocket requests.
   name (`obs_module_name`), with a short description. Unchanged, so nothing breaks: the repository and file names
   (`obs-lua-bridge`), the procedures and signals (`luabridge_*`), the websocket vendor `LuaBridge` and owner IDs.
 - **Docs:** the README and INSTALL.md state that Lua Bridge is an independent plugin and not a product of the
-  OBS Project; the README has bug-report instructions; `docs/POLICY-CHECK.md` maps
-  each policy point to where the repository meets it.
+  OBS Project; the README has bug-report instructions and an "AI usage" section saying what was
+  written with an AI assistant and how it was reviewed and tested; `docs/POLICY-CHECK.md` quotes each policy rule
+  and records how the repository meets it, and where it doesn't.
 
 ### Packaging
 - **macOS:** the `.pkg` no longer installs debug symbols (`obs-lua-bridge.plugin.dSYM`) next to the plugin, which

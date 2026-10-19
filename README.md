@@ -76,6 +76,26 @@ module can send Lua Bridge commands ("Custom – Send Vendor Request").
 - [docs/integrations/control-surfaces.md](docs/integrations/control-surfaces.md): sending commands from control surfaces. Companion is confirmed; others are being checked.
 - [CHANGELOG.md](CHANGELOG.md): what's new. [CONTRIBUTING.md](CONTRIBUTING.md): building and testing.
 
+## AI usage
+Lua Bridge was developed with extensive help from an AI coding assistant, Anthropic's Claude (through Claude
+Code). Every change by a person since the repository was created from the OBS plugin template was made with it;
+those commits carry a `Co-Authored-By: Claude` line.
+- **Design:** the specification and the script API were worked out with Claude. The maintainer set the goals and
+  made the design decisions.
+- **Code:** Claude wrote most of the plugin (C++), the Lua helper and examples, and the build, packaging and CI
+  scripts, following the maintainer's instructions.
+- **Tests:** Claude wrote the unit tests, websocket test suites, fuzzers and stress tests, and ran them against
+  test copies of OBS.
+- **Docs:** Claude drafted most of the documentation; the maintainer edited it.
+
+**The maintainer's role:** the maintainer defined the goals, made every design decision, reviewed every change
+report and pull request before merging, and tested the plugin in OBS on Windows.
+
+**Review and testing:** CI builds on Windows, macOS and Ubuntu and runs the unit tests on every pull request, and
+changes merge only when CI passes. Before the first beta (0.9.0-beta1), the plugin was also tested on Windows
+with fuzzing, a 1-hour stress test, an 8-hour soak, shutdowns with commands in flight, and scene collection and
+profile switching; those runs haven't been repeated for 0.9.0-beta2. It hasn't been tested on a real Mac yet.
+
 ## Reporting bugs
 [Open an issue](https://github.com/midnight-studios/obs-lua-bridge/issues/new/choose) on GitHub. The bug report
 form asks for:
