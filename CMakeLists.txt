@@ -63,6 +63,7 @@ target_sources(
     src/signals.cpp
     src/websocket-vendor.cpp
     src/dock/dock-events.cpp
+    src/dock/dock-frame.cpp
     src/dock/docks-window.cpp
     src/dock/lua-bridge-dock.cpp
     src/dock/owner-section.cpp

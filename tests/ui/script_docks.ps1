@@ -27,10 +27,16 @@
       4. A corrupt docks.json is renamed to docks.json.invalid and OBS starts without
          script docks; with no scripts, the window says so.
       5. When the only row is a dock whose script isn't loaded, unticking it empties the table.
-    Every OBS run must end with 0 memory leaks and no unexpected Lua Bridge warnings.
+      6. Docks docked in the main window (a saved layout, see $dockedLayout), one left open,
+         two closed with their X (a script dock and the Lua Bridge dock), one floating: OBS
+         shows its "Closing Dockable Window" notice for the X, as for any dock, but not at the
+         next starts.
+    Every OBS start must show no message box, and every OBS run must end with 0 memory leaks
+    and no unexpected Lua Bridge warnings.
 
     The test deletes docks.json (and docks.json.invalid) in the test OBS before it starts
-    and when it finishes.
+    and when it finishes, and puts back the test OBS's user.ini (dock layout, current scene
+    collection and profile) as it found it.
 
 .EXAMPLE
     pwsh tests/ui/script_docks.ps1 -Root C:\obs-test
@@ -46,6 +52,7 @@ $exe = Join-Path $Root 'bin\64bit\obs64.exe'
 $logDir = Join-Path $Root 'config\obs-studio\logs'
 $configDir = Join-Path $Root 'config\obs-studio\plugin_config\obs-lua-bridge'
 $docksJson = Join-Path $configDir 'docks.json'
+$userIni = Join-Path $Root 'config\obs-studio\user.ini'
 $collection = 'LuaBridge Docks'
 $otherCollection = 'LuaBridge B'
 $emptyCollection = 'LuaBridge Empty'
@@ -110,6 +117,11 @@ function Start-Obs([string] $Collection) {
         }
         if ($script:log -and (Select-String -Path $script:log.FullName -SimpleMatch '==== Startup complete' -Quiet)) {
             Start-Sleep -Seconds 3 # scripts register right after startup
+            # Nothing may greet the user at startup (OBS's notices are queued, so they are
+            # open by now); close any box so the test can go on
+            $boxes = Get-MessageBoxes
+            Check ($boxes.Count -eq 0) "no message box at startup$(if ($boxes) { ': ' + (($boxes | ForEach-Object { $_.Current.Name }) -join ', ') })"
+            foreach ($box in $boxes) { Close-Window $box }
             return
         }
     }
@@ -160,6 +172,21 @@ function Find-All($root, $property, $value) {
 
 function Get-Dock([string] $Title) {
     Find-All (Get-MainWindow) $AE::ClassNameProperty 'OBSDock' | Where-Object { $_.Current.Name -eq $Title } | Select-Object -First 1
+}
+
+function Get-MessageBoxes {
+    $obs = Get-Process obs64 | Select-Object -First 1
+    $cond = [System.Windows.Automation.PropertyCondition]::new($AE::ProcessIdProperty, $obs.Id)
+    @($AE::RootElement.FindAll($Scope::Descendants, $cond) | Where-Object { $_.Current.ClassName -eq 'QMessageBox' })
+}
+
+# The Close or Float button of a dock's title bar. Only a docked dock has them: a floating
+# one has a native window frame instead.
+function Get-TitleButton([string] $Title, [string] $Name) {
+    $dock = Get-Dock $Title
+    if ($dock) {
+        Find-All $dock $AE::ClassNameProperty 'QDockWidgetTitleButton' | Where-Object { $_.Current.Name -eq $Name } | Select-Object -First 1
+    }
 }
 
 function Get-Rect($el) { $r = $el.Current.BoundingRectangle; '{0},{1},{2},{3}' -f [int]$r.X, [int]$r.Y, [int]$r.Width, [int]$r.Height }
@@ -268,10 +295,31 @@ function Close-Window($el) {
 
 function Read-DocksJson { if (Test-Path $docksJson) { Get-Content $docksJson -Raw | ConvertFrom-Json } }
 
+# A saved OBS dock layout (user.ini [BasicWindow] DockState, from QMainWindow::saveState)
+# with the Lua Bridge, Stopwatch (luabridge.stopwatch) and Dock Test (luabridge.docktest)
+# docks docked in the main window. Docking takes a mouse drag, which the test doesn't do, so
+# the layout was saved once from the test OBS (OBS 32.2.2) and is restored from here.
+$dockedLayout = 'AAAA/wAAAAD9AAAABAAAAAAAAAIgAAADDPwCAAAABfsAAAAiAGwAdQBhAGIAcgBpAGQAZwBlAC4AcwBwAGkAawBlAF8AYQEAAAAbAAADDAAAAAAAAAAA+wAAABIAcwB0AGEAdABzAEQAbwBjAGsCAAABZAAAARsAAAK8AAAAyPsAAAAUAGwAdQBhAC0AYgByAGkAZABnAGUBAAAAGwAAAU4AAABoAP////sAAAAmAGwAdQBhAGIAcgBpAGQAZwBlAC4AcwB0AG8AcAB3AGEAdABjAGgBAAABbQAAAU4AAABoAP////sAAAAkAGwAdQBhAGIAcgBpAGQAZwBlAC4AZABvAGMAawB0AGUAcwB0AQAAAr8AAABoAAAAaAD///8AAAABAAABIgAAAwz8AgAAAAr7AAAAEgBtAGkAeABlAHIARABvAGMAawEAAAAbAAAB0gAAAQYA////+wAAABQAcwBjAGUAbgBlAHMARABvAGMAawEAAAHxAAABNgAAAIwA////+wAAACAAQQB1AGQAaQBvAE0AbwBuAGkAdABvAHIARABvAGMAawIAAAIjAAABeAAAAMgAAACY+wAAACIAbAB1AGEAYgByAGkAZABnAGUALgBzAHAAaQBrAGUAXwBkAgAAAAAAAAAAAAAAZAAAAB77AAAAIgBsAHUAYQBiAHIAaQBkAGcAZQAuAHMAcABpAGsAZQBfAGMCAAAAAAAAAAAAAABkAAAAHvsAAAAiAGwAdQBhAGIAcgBpAGQAZwBlAC4AcwBwAGkAawBlAF8AYgIAAAAAAAAAAAAAAGQAAAAe+wAAACAAbAB1AGEAYgByAGkAZABnAGUALgB3AHMAdABlAHMAdAIAAAAAAAAAAAAAAGQAAAAe+wAAACQAbAB1AGEAYgByAGkAZABnAGUALgBzAHQAcgBlAHMAcwAuADMCAAAAAAAAAAAAAABkAAAAHvsAAAAcAGwAdQBhAGIAcgBpAGQAZwBlAC4AZwBvAG4AZQIAAAAAAAAAAAAAAGQAAAAe+wAAABwAbAB1AGEAYgByAGkAZABnAGUALgBwAGkAbgBnAgAAAlYAAAEJAAABVAAAAaQAAAACAAAEHwAAAJb8AQAAAAH7AAAACgBUAGkAbQBlAHIAAAAAAAAABB8AAAAAAAAAAAAAAAMAAAK2AAABBvwBAAAAA/sAAAAWAHMAbwB1AHIAYwBlAHMARABvAGMAawEAAAIkAAAA1gAAAJgA////+wAAAB4AdAByAGEAbgBzAGkAdABpAG8AbgBzAEQAbwBjAGsBAAAC/gAAALcAAACCAP////sAAAAYAGMAbwBuAHQAcgBvAGwAcwBEAG8AYwBrAQAAA7kAAAEhAAAAzgD///8AAAK2AAACAgAAAAEAAAACAAAAAQAAAAL8AAAAAA=='
+
+# OBS closed: replaces the saved dock layout in user.ini
+function Set-DockLayout([string] $Layout) {
+    $bom = ([IO.File]::ReadAllBytes($userIni))[0] -eq 0xEF
+    $text = [IO.File]::ReadAllText($userIni)
+    if ($text -notmatch '(?m)^DockState=') { throw "no DockState in $userIni" }
+    $text = [regex]::Replace($text, '(?m)^DockState=.*$', "DockState=$Layout")
+    [IO.File]::WriteAllText($userIni, $text, [Text.UTF8Encoding]::new($bom))
+}
+
+function Invoke-Element($el) {
+    $el.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Start-Sleep -Milliseconds 800
+}
+
 # --- Test ----------------------------------------------------------------------------------
 
 if (Get-Process obs64 -ErrorAction SilentlyContinue) { throw 'an obs64 process is already running; close it first' }
 Remove-Item $docksJson, "$docksJson.invalid", "$docksJson.bak" -ErrorAction SilentlyContinue
+$userIniBefore = [IO.File]::ReadAllBytes($userIni)
 
 # Whatever happens, close OBS normally (never kill it) and remove the test's files
 try {
@@ -422,12 +470,54 @@ Check ($null -eq (Get-Dock 'Gone Script')) 'the dock is gone'
 Close-Window (Get-DocksWindow)
 Assert-NoUnexpectedWarnings
 Stop-Obs
+
+Write-Host "`n== 6. Docks closed while docked: no notice at the next starts"
+# With Qt 6.11 (OBS 32.2 and later), restoring the layout sends a close event to a dock that
+# was docked and closed with its X; OBS answers any close event with its notice. The plugin
+# ignores that event for its own docks while OBS restores the layout.
+Set-Content $docksJson '{"version":1,"docks":[{"owner":"stopwatch"},{"owner":"docktest"},{"owner":"ping"}]}'
+Set-DockLayout $dockedLayout
+Start-Obs $collection
+$docked = @('Lua Bridge', 'Stopwatch (demo)', 'Dock Test') | Where-Object { Get-TitleButton $_ 'Close' }
+Check ($docked.Count -eq 3) "the saved layout docks Lua Bridge, Stopwatch and Dock Test in the main window ($($docked -join ', '))"
+$menu = Get-MenuEntries 'Docks'
+if ($menu.Entries['Ping'].State -ne 'On') {
+    Invoke-Element $menu.Entries['Ping'].Element
+    $menu = Get-MenuEntries 'Docks'
+}
+& $menu.Collapse
+$ping = Get-Dock 'Ping'
+Check ($ping -and -not $ping.Current.IsOffscreen -and -not (Get-TitleButton 'Ping' 'Close')) 'Ping is open and floating'
+foreach ($title in 'Dock Test', 'Lua Bridge') {
+    Invoke-Element (Get-TitleButton $title 'Close')
+    # OBS's notice when a user closes a dock: expected here, and it proves the startup check
+    # would see one
+    $boxes = Get-MessageBoxes
+    Check ($boxes.Count -eq 1 -and $boxes[0].Current.Name -eq 'Closing Dockable Window') "closing $title with its X shows OBS's notice"
+    foreach ($box in $boxes) { Close-Window $box }
+}
+Assert-NoUnexpectedWarnings
+Stop-Obs
+
+$qt = [regex]::Match((Get-Content $script:log.FullName -Raw), 'Qt Version: ([\d.]+) \(runtime\)').Groups[1].Value
+foreach ($start in 1, 2) {
+    Start-Obs $collection # checks that no message box opened
+    $menu = Get-MenuEntries 'Docks'; & $menu.Collapse
+    $states = ('Lua Bridge', 'Stopwatch (demo)', 'Dock Test', 'Ping' | ForEach-Object { "$_=$($menu.Entries[$_].State)" }) -join ', '
+    Check ($states -eq 'Lua Bridge=Off, Stopwatch (demo)=On, Dock Test=Off, Ping=On') "start $($start): the docks are as they were left ($states)"
+    Check ($null -ne (Get-TitleButton 'Stopwatch (demo)' 'Close')) "start $($start): Stopwatch is still docked"
+    $ignored = Get-LogLines 'ignored a close event while OBS restored the dock layout'
+    Write-Host "  info  Qt $qt; close events ignored during the restore: $($ignored.Count)"
+    Assert-NoUnexpectedWarnings
+    Stop-Obs
+}
 } finally {
     if (Get-Process obs64 -ErrorAction SilentlyContinue) {
         Write-Host 'test stopped early; closing OBS'
         try { Stop-Obs } catch { Write-Host $_ }
     }
     Remove-Item $docksJson, "$docksJson.invalid", "$docksJson.bak" -ErrorAction SilentlyContinue
+    if (-not (Get-Process obs64 -ErrorAction SilentlyContinue)) { [IO.File]::WriteAllBytes($userIni, $userIniBefore) }
 }
 Write-Host ''
 if ($script:failures.Count) {

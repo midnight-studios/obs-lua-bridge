@@ -51,8 +51,23 @@ window through Windows UI Automation: it opens Tools → Lua Bridge, ticks
 OBS and checks that the docks come back where they were. Its input goes to OBS
 as UI Automation calls and posted window messages, so it never moves your mouse
 or types into other windows, but a new dock takes the focus when it opens. It
-starts and closes OBS five times, never kills it, and deletes `docks.json` in
-the test OBS before and after.
+starts and closes OBS eight times and never kills it. It deletes `docks.json` in
+the test OBS before and after, and puts the test OBS's `user.ini` back as it
+found it (dock layout, current scene collection and profile).
+- **No message box at startup:** every start checks that OBS shows no message
+  box. Phase 6 starts from a saved layout (in the script) with the Lua Bridge,
+  Stopwatch and Dock Test docks docked in the main window; docking needs a mouse
+  drag, which the test doesn't do. It closes Dock Test and Lua Bridge with their
+  X: OBS shows its "Closing Dockable Window" notice then, as for any dock. The
+  next two starts must show none. With Qt 6.11 (OBS 32.2 and later), OBS's
+  layout restore sends a close event to such a dock, OBS's own docks included,
+  and OBS answers it with that notice. Lua Bridge's docks ignore it during the
+  restore and log `ignored a close event while OBS restored the dock layout`.
+  OBS 31 (Qt 6.8) sends no such event.
+- **Renaming a dock** (phase 1) checks that the dock's frame is OBS's own
+  (`OBSDock`). If a new OBS version wraps docks differently, the plugin stops
+  renaming docks live, logs `the new title applies when OBS restarts`, and this
+  check fails: look at the frame before changing anything.
 
 **Closing the test OBS from a script:** use `tools/close-test-obs.ps1`. It
 sends the same message as the window's close button and never kills OBS. Don't
@@ -79,7 +94,7 @@ the client stops.
 | Examples | `py tests/websocket/test_examples.py` | `scoreboard.lua`, `stopwatch-demo.lua` loaded | 30 s |
 | Rate limiting | `py tests/websocket/test_rate_limit.py` | `ws-companion.lua`, `hello-bridge.lua` loaded | 15 s |
 | Ping-pong example | `py tests/websocket/test_ping_pong.py`, then `--close` | the "LuaBridge PingPong" and "LuaBridge Ping Only" collections (`setup_test_obs.py`) | 1 min |
-| Script docks (Windows) | `pwsh tests/ui/script_docks.ps1 [-Root C:\obs-test]` (`-Legacy33` for an OBS 33 copy with the plugin in `<Root>\_legacy`) | OBS closed; the "LuaBridge Docks", "LuaBridge B" and "LuaBridge Empty" collections and the "LuaBridge P2" profile (`setup_test_obs.py`) | 5 min |
+| Script docks (Windows) | `pwsh tests/ui/script_docks.ps1 [-Root C:\obs-test]` (`-Legacy33` for an OBS 33 copy with the plugin in `<Root>\_legacy`) | OBS closed; the "LuaBridge Docks", "LuaBridge B" and "LuaBridge Empty" collections and the "LuaBridge P2" profile (`setup_test_obs.py`) | 7 min |
 
 **Ping-pong checks** (`test_ping_pong.py`). It switches collections by itself and returns to the one it started in.
 1. **ping without pong:**

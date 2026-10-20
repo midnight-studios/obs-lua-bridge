@@ -25,6 +25,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <QPointer>
 
 #include "dock/dock-events.hpp"
+#include "dock/dock-frame.hpp"
 #include "dock/docks-window.hpp"
 #include "dock/lua-bridge-dock.hpp"
 #include "dock/script-docks.hpp"
@@ -63,6 +64,7 @@ void create_dock()
 	}
 	dock_added = true;
 	dock_widget = dock;
+	luabridge::dock::guard_layout_restore(dock);
 	luabridge::dock::attach_events(dock);
 }
 
@@ -117,6 +119,7 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 {
 	switch (event) {
 	case OBS_FRONTEND_EVENT_FINISHED_LOADING:
+		luabridge::dock::end_layout_restore();
 		luabridge::signaling::emitter().ready(luabridge::info_json());
 		break;
 	case OBS_FRONTEND_EVENT_EXIT:
@@ -126,6 +129,7 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 		// obs-websocket unloads before this plugin; stop using it now
 		luabridge::websocket::stop();
 		exiting = true;
+		luabridge::dock::end_layout_restore();
 		remove_docks();
 		break;
 	default:

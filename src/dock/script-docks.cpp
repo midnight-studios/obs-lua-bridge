@@ -28,6 +28,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <util/platform.h>
 
 #include "dock-events.hpp"
+#include "dock-frame.hpp"
 #include "lua-bridge-dock.hpp"
 
 namespace luabridge::dock {
@@ -170,6 +171,7 @@ bool ScriptDocks::create(const script_docks::ScriptDock &dock)
 		return false;
 	}
 	widgets_[dock.owner] = widget;
+	guard_layout_restore(widget);
 	if (seen_.count(dock.owner))
 		widget->set_owner_seen();
 	widget->on_display_name(
@@ -201,9 +203,16 @@ void ScriptDocks::apply_title(const std::string &owner)
 	auto it = widgets_.find(owner);
 	if (!dock || it == widgets_.end())
 		return;
-	// The Docks menu entry follows the dock's window title
-	if (QDockWidget *dock_widget = dock_of(it->second))
-		dock_widget->setWindowTitle(qstr(script_docks::dock_title(*dock)));
+	// The Docks menu entry follows the dock's window title. Only on OBS's own
+	// dock frame: if OBS ever wraps docks differently, the saved title is used
+	// when the dock is created at the next start instead
+	QDockWidget *frame = obs_dock_frame(it->second);
+	if (!frame) {
+		obs_log(LOG_INFO, "script dock '%s': the new title applies when OBS restarts (no OBS dock frame found)",
+			printable(owner).c_str());
+		return;
+	}
+	frame->setWindowTitle(qstr(script_docks::dock_title(*dock)));
 }
 
 void ScriptDocks::display_name_seen(const std::string &owner, const std::string &display_name)

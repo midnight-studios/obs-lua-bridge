@@ -262,7 +262,7 @@ The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one coll
 ### A dock per script
 
 **Tools → Lua Bridge** opens the **Lua Bridge Docks** window. It lists every registered owner with its display name, owner ID and status: **Running**, **Not responding** (stale), or **Not loaded** (it has a dock but isn't registered). Tick **Dock** to give that owner a dock of its own:
-- The dock is listed in the Docks menu like any other and shows the owner's section, with the same controls as in the Lua Bridge dock. Its title is the **Dock title** typed in the window, or the owner's `display_name` when that's empty. A new title applies at once.
+- The dock is listed in the Docks menu like any other and shows the owner's section, with the same controls as in the Lua Bridge dock. Its title is the **Dock title** typed in the window, or the owner's `display_name` when that's empty. A new title applies at once. (The plugin renames the dock frame OBS wraps it in. If a future OBS wraps docks differently, the plugin doesn't rename it live; it logs `the new title applies when OBS restarts`, and the saved title is used from the next start.)
 - A new dock opens as a floating window over OBS; move or dock it where you want. From then on OBS remembers its position, size and visibility, the same in every profile and scene collection.
 - Until the owner registers, the dock says it's waiting for the script. After the owner unregisters (the script was removed, or isn't in the current scene collection), it says the script isn't running. An owner that stops responding is greyed out with **Remove**, as in the Lua Bridge dock; **Remove** unregisters the owner and keeps the dock.
 - Untick **Dock** to remove the dock. Up to 32 owners can have their own dock.

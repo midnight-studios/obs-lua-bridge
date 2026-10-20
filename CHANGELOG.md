@@ -17,6 +17,14 @@ websocket requests.
 - The chosen docks are saved in `docks.json` in the plugin's config folder; an unreadable file is set aside as
   `docks.json.invalid`.
 
+### Fixed
+- **OBS's "Closing Dockable Window" notice at startup.** On OBS 32.2 and later (Qt 6.11), a Lua Bridge dock that was
+  docked in the main window and closed with its X made OBS show this notice again at the next start, although
+  nobody had closed anything. OBS's own docks do the same (the Stats dock, for example). Lua Bridge's docks now
+  ignore the close event that OBS's layout restore sends them at startup; the dock stays closed, as it was left.
+  Closing a dock yourself still shows OBS's notice, as for any dock. This affected the Lua Bridge dock in 0.9.0-beta1
+  too.
+
 ### OBS Forum resource policy
 - **Name:** the plugin is now called **Lua Bridge** everywhere users see it (README, docs, package metadata, the
   example scripts' descriptions, release titles). OBS's Plugin Manager now shows "Lua Bridge" instead of the file
