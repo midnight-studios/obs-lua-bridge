@@ -7,7 +7,7 @@
 local fake = {
 	present = true,          -- false: the plugin's procedures don't exist
 	api_version = 1,         -- reported by luabridge_get_info (may be a string or nil)
-	plugin_version = "0.9.0-beta1", -- reported by luabridge_get_info (a pre-release, as shipped)
+	plugin_version = "0.9.0-beta2", -- reported by luabridge_get_info (a pre-release, as shipped)
 	owners = {},             -- owner id -> true while registered in the "plugin"
 	stale = {},              -- owner id -> true: calls fail with "owner is stale"
 	fail_next = {},          -- procedure name -> error to return once

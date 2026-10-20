@@ -119,7 +119,7 @@ local function on_heartbeat(ok)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: dock test. Shows every dock control type in Docks > Lua Bridge "
+	return "Lua Bridge: dock test. Shows every dock control type in Docks > Lua Bridge "
 		.. "and logs each command. Use the buttons below to stop and resume the heartbeat."
 end
 

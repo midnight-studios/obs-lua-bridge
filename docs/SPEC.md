@@ -1,6 +1,6 @@
-# Spec Guide: Lua Bridge for OBS — From Scratch to First Production Release
+# Spec Guide: Lua Bridge — From Scratch to First Production Release
 
-**Working name:** Lua Bridge for OBS (`obs-lua-bridge`). Rename freely; the name only appears in `buildspec.json`, the procedure and signal prefixes, and the websocket vendor name.
+**Working name:** Lua Bridge (`obs-lua-bridge`). Rename freely; the name only appears in `buildspec.json`, the procedure and signal prefixes, and the websocket vendor name.
 **Author:** GrumpyDog (midnight-studios)
 **Goal of v1.0:** A small native OBS plugin that gives ordinary Lua scripts (running in Tools → Scripts) three new abilities:
 - a dock with live controls;
@@ -251,7 +251,7 @@ The helper includes a minimal pure-Lua JSON encoder/decoder, because OBS Lua has
 1. On GitHub, open **obsproject/obs-plugintemplate** → **Use this template** → create `midnight-studios/obs-lua-bridge` (public).
 2. Clone it: `gh repo clone midnight-studios/obs-lua-bridge` into `C:\dev\`.
 3. Edit **`buildspec.json`**:
-   - `name: "obs-lua-bridge"`, `displayName: "Lua Bridge for OBS"`, `version: "0.1.0"`, `author`, `website`, `email`.
+   - `name: "obs-lua-bridge"`, `displayName: "Lua Bridge"`, `version: "0.1.0"`, `author`, `website`, `email`.
    - Set a real macOS `bundleId`, for example `com.midnightstudios.obs-lua-bridge`.
    - Set `obs-studio.version` to your **minimum supported OBS version**. The template currently pins 31.1.1; 31.x is a sensible minimum. Update the hashes the way the template wiki describes.
 4. In **`CMakeLists.txt`**, turn on `ENABLE_FRONTEND_API` and `ENABLE_QT` (both default to OFF). The dock needs both.
@@ -289,7 +289,7 @@ obs-lua-bridge/
 Create this first. Claude Code reads it at the start of every session.
 
 ```markdown
-# Lua Bridge for OBS — project rules
+# Lua Bridge — project rules
 - Spec: docs/SPEC.md (copy of this guide's Parts B, D, E). Do not change the public API
   (procedure/signal names, JSON shapes) without updating docs/API.md and asking first.
 - Language: C++17 for plugin code, Lua 5.1/LuaJIT-compatible for lua/.

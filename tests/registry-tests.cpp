@@ -1,5 +1,5 @@
 /*
-Lua Bridge for OBS
+Lua Bridge
 Copyright (C) 2026 Midnight Studios
 
 This program is free software; you can redistribute it and/or modify

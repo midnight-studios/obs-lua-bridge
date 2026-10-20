@@ -188,7 +188,7 @@ local function tick()
 end
 
 function script_description()
-	return "Lua Bridge for OBS: stopwatch demo (not the real StopWatch script). Controls are in "
+	return "Lua Bridge: stopwatch demo (not the real StopWatch script). Controls are in "
 		.. "Docks > Lua Bridge, or below when the plugin isn't installed."
 end
 

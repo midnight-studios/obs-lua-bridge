@@ -1,6 +1,6 @@
 # StopWatch integration
 
-This page defines how the StopWatch script ([midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua)) plugs into Lua Bridge for OBS. `lua/examples/stopwatch-demo.lua` in this repository is a **demo** that implements the same contract. Dock layouts, Stream Deck buttons and other websocket clients built against the demo therefore keep working when the real script adopts the integration.
+This page defines how the StopWatch script ([midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua)) plugs into Lua Bridge. `lua/examples/stopwatch-demo.lua` in this repository is a **demo** that implements the same contract. Dock layouts, Stream Deck buttons and other websocket clients built against the demo therefore keep working when the real script adopts the integration.
 
 > **Don't run the demo and the real StopWatch at the same time.** Both use the owner `stopwatch`. The second one to load replaces the first one's registration, and the plugin logs `owner 'stopwatch' was already registered and active; its registration was replaced`. Load only one of them.
 

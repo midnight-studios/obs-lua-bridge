@@ -1,4 +1,4 @@
--- scoreboard.lua: a minimal score board with Lua Bridge for OBS
+-- scoreboard.lua: a minimal score board with Lua Bridge
 --
 -- SPDX-License-Identifier: MIT
 -- Copyright (c) 2026 Midnight Studios. See lua/LICENSE (MIT); the plugin itself is GPL-2.0-or-later.
@@ -111,7 +111,7 @@ local function run(command)
 end
 
 function script_description()
-	return "Lua Bridge for OBS: score board example. Controls are in Docks > Lua Bridge, or below "
+	return "Lua Bridge: score board example. Controls are in Docks > Lua Bridge, or below "
 		.. "when the plugin isn't installed."
 end
 

@@ -1,4 +1,4 @@
-# Testing Lua Bridge for OBS
+# Testing Lua Bridge
 
 Every test suite, how to run it, how long it takes, and what needs a person.
 
@@ -17,6 +17,10 @@ Everything else below runs locally against a test OBS.
   folder, for example through a junction.
 - So the package can be tested unmodified in a clean portable OBS, with the same `bin/64bit` + `data` split
   that ProgramData uses.
+- **OBS 33 renamed these variables** for the current ("legacy") layout: `OBS_LEGACY_PLUGINS_PATH` and
+  `OBS_LEGACY_PLUGINS_DATA_PATH`. On OBS 33, `OBS_PLUGINS_PATH` means the new layout (`<path>/<plugin>/<plugin>.dll`)
+  and is ignored for this package. Checked on 33.0.0-rc2. OBS 33's loader also still scans the portable
+  `obs-plugins/64bit` layout that `tools/deploy-test.ps1` uses (from its source, `PluginModuleLoader_Windows.cpp`).
 - A fresh portable OBS reports `Number of memory leaks: 1` on its very first start, with or without plugins.
   Judge leaks from the second start on.
 

@@ -62,7 +62,7 @@ local function check_received()
 end
 
 function script_description()
-	return "Lua Bridge for OBS: in-OBS checks of the luabridge.lua helper. Results go to the script log."
+	return "Lua Bridge: in-OBS checks of the luabridge.lua helper. Results go to the script log."
 end
 
 function script_load(settings)

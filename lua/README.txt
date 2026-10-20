@@ -1,5 +1,5 @@
-Lua Bridge for OBS: Lua helper and examples
-===========================================
+Lua Bridge: Lua helper and examples
+===================================
 
 luabridge.lua   The helper library for your own scripts.
 examples/       Ready-to-run example scripts:

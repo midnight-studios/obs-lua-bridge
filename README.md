@@ -1,6 +1,8 @@
-# Lua Bridge for OBS
+# Lua Bridge
 
-> **Beta (0.9.0-beta1).** Feedback and bug reports are welcome: [open an issue](https://github.com/midnight-studios/obs-lua-bridge/issues).
+> **Beta (0.9.0-beta2).** Feedback and bug reports are welcome: see [Reporting bugs](#reporting-bugs).
+
+Lua Bridge is an independent plugin for OBS Studio and not a product of the OBS Project.
 
 Lua Bridge gives your OBS Lua scripts what OBS's own scripting can't do:
 - **Controls in a dock:** buttons, labels, number and text inputs, and toggles in **Docks → Lua Bridge**.
@@ -15,6 +17,10 @@ Scripts written for it keep working when the plugin isn't installed: they simply
 Requires **OBS Studio 31.1 or newer**. Download the file for your system from
 [Releases](https://github.com/midnight-studios/obs-lua-bridge/releases); full steps and uninstalling are in
 [docs/INSTALL.md](docs/INSTALL.md).
+
+**OBS 33:** its Plugin Manager labels Lua Bridge "Legacy" because of where it's installed. It still loads and
+works; the install layout will move once the official OBS plugin template supports the new one
+([FAQ](docs/INSTALL.md#faq)).
 
 **Windows:**
 1. Close OBS.
@@ -70,7 +76,40 @@ module can send Lua Bridge commands ("Custom – Send Vendor Request").
 - [docs/integrations/control-surfaces.md](docs/integrations/control-surfaces.md): sending commands from control surfaces. Companion is confirmed; others are being checked.
 - [CHANGELOG.md](CHANGELOG.md): what's new. [CONTRIBUTING.md](CONTRIBUTING.md): building and testing.
 
+## AI usage
+Lua Bridge was developed with extensive help from an AI coding assistant, Anthropic's Claude (through Claude
+Code). Every change by a person since the repository was created from the OBS plugin template was made with it;
+those commits carry a `Co-Authored-By: Claude` line.
+- **Design:** the specification and the script API were worked out with Claude. The maintainer set the goals and
+  made the design decisions.
+- **Code:** Claude wrote most of the plugin (C++), the Lua helper and examples, and the build, packaging and CI
+  scripts, following the maintainer's instructions.
+- **Tests:** Claude wrote the unit tests, websocket test suites, fuzzers and stress tests, and ran them against
+  test copies of OBS.
+- **Docs:** Claude drafted most of the documentation; the maintainer edited it.
+
+**The maintainer's role:** the maintainer defined the goals, made every design decision, reviewed every change
+report and pull request before merging, and tested the plugin in OBS on Windows.
+
+**Review and testing:** CI builds on Windows, macOS and Ubuntu and runs the unit tests on every pull request, and
+changes merge only when CI passes. Before the first beta (0.9.0-beta1), the plugin was also tested on Windows
+with fuzzing, a 1-hour stress test, an 8-hour soak, shutdowns with commands in flight, and scene collection and
+profile switching; those runs haven't been repeated for 0.9.0-beta2. It hasn't been tested on a real Mac yet.
+
+## Reporting bugs
+[Open an issue](https://github.com/midnight-studios/obs-lua-bridge/issues/new/choose) on GitHub. The bug report
+form asks for:
+- your **OBS version** (Help → About) and **operating system**;
+- the **Lua Bridge version**, from the OBS log line `[lua-bridge] plugin loaded successfully (version …)`;
+- **your OBS log file:** in OBS, **Help → Log Files → Upload Current Log File**, and paste the link (or attach
+  the file);
+- what you did, what happened, and which scripts were loaded. A minimal script that shows the problem helps a lot.
+
+Security problems: please report them privately, as [SECURITY.md](SECURITY.md) describes, not as issues.
+
 ## License
+- **Source code:** all of it is in this repository, and every release also attaches the complete source as
+  `obs-lua-bridge-<version>-source.tar.xz`.
 - **The plugin:** [GPL-2.0-or-later](LICENSE).
 - **The Lua helper and examples in [lua/](lua/):** [MIT](lua/LICENSE), so you can copy `luabridge.lua` into scripts under any license.
 - **Third-party notices:** [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

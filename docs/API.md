@@ -1,4 +1,4 @@
-# Lua Bridge for OBS: script API (api_version 1)
+# Lua Bridge: script API (api_version 1)
 
 This is the contract between the plugin and scripts. The plugin exposes **procedures** that scripts call, and emits **signals** that scripts connect to. All structured data is passed as UTF-8 JSON strings.
 
@@ -101,7 +101,7 @@ All procedures are on the global proc handler and set `out bool ok` and `out str
 ### `luabridge_get_info` JSON
 
 ```json
-{"api_version":1,"plugin_version":"0.9.0-beta1","obs_version":"32.2.2","capabilities":{"commands":true,"events":true,"heartbeat":true,"run_command":true,"state":true,"websocket":true}}
+{"api_version":1,"plugin_version":"0.9.0-beta2","obs_version":"32.2.2","capabilities":{"commands":true,"events":true,"heartbeat":true,"run_command":true,"state":true,"websocket":true}}
 ```
 
 - `capabilities` is an object of flags. It isn't an array because the same JSON is sent over obs-websocket, which can't carry arrays of strings.
