@@ -28,11 +28,15 @@ namespace luabridge::dock {
 
 namespace {
 
+bool restore_over = false;
+
 class RestoreGuard : public QObject {
 public:
 	bool eventFilter(QObject *watched, QEvent *event) override
 	{
-		if (event->type() != QEvent::Close)
+		// The filter is deleted when the restore is over; the check is a second
+		// line of defence, so a close by the user always reaches OBS
+		if (event->type() != QEvent::Close || restore_over)
 			return false;
 		// Not delivered, so OBS shows no notice; the event stays accepted, so
 		// Qt still hides the dock as the saved layout says
@@ -43,7 +47,6 @@ public:
 };
 
 RestoreGuard *guard = nullptr;
-bool restore_over = false;
 
 } // namespace
 
@@ -58,8 +61,11 @@ void guard_layout_restore(QWidget *content)
 	if (restore_over)
 		return;
 	QDockWidget *frame = obs_dock_frame(content);
-	if (!frame)
+	if (!frame) {
+		// Not OBS's dock frame: leave its events alone
+		obs_log(LOG_INFO, "dock: no OBS dock frame found; OBS may show its close notice at startup");
 		return;
+	}
 	if (!guard)
 		guard = new RestoreGuard;
 	frame->installEventFilter(guard);

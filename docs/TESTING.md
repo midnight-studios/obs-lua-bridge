@@ -64,6 +64,14 @@ found it (dock layout, current scene collection and profile).
   and OBS answers it with that notice. Lua Bridge's docks ignore it during the
   restore and log `ignored a close event while OBS restored the dock layout`.
   OBS 31 (Qt 6.8) sends no such event.
+  - **How:** an event filter on OBS's own dock frame (`OBSDock`; nothing is
+    installed on any other frame, and that is logged). The event stays
+    accepted, so the dock still closes; only OBS's notice is skipped.
+  - **Only during startup:** the filter is removed at
+    `OBS_FRONTEND_EVENT_FINISHED_LOADING`, which OBS sends at the end of its
+    startup, before it handles any click. A close by the user is never
+    swallowed. Phase 6 checks this: its X clicks come after loading, and OBS's
+    notice must appear for each.
 - **Renaming a dock** (phase 1) checks that the dock's frame is OBS's own
   (`OBSDock`). If a new OBS version wraps docks differently, the plugin stops
   renaming docks live, logs `the new title applies when OBS restarts`, and this

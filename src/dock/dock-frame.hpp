@@ -35,11 +35,23 @@ QDockWidget *obs_dock_frame(QWidget *content);
 // With Qt 6.11 (OBS 32.2 and later), the restore sends a close event to a dock
 // that was docked in the main window and closed with its X, and OBS answers
 // every close event with its "Closing Dockable Window" notice, although nobody
-// closed anything. Until end_layout_restore(), our docks' frames ignore close
-// events: the dock is still hidden as the layout says, without the notice.
+// closed anything.
+//
+// So until end_layout_restore(), an event filter on the dock's frame keeps
+// close events from reaching OBS's handler. Only on OBS's own frame (see
+// obs_dock_frame; otherwise nothing is installed, and that is logged). The
+// event stays accepted: the dock is still hidden as the layout says, only the
+// notice is skipped.
+//
+// A close by the user is never swallowed: the guard ends at
+// OBS_FRONTEND_EVENT_FINISHED_LOADING, which OBS sends at the end of its
+// startup (OBSBasic::OBSInit), before its event loop runs and handles any
+// click. After that every close, and OBS's notice for it, is untouched.
+//
 // Call right after adding a dock; does nothing once the restore is over.
 void guard_layout_restore(QWidget *content);
-// At OBS_FRONTEND_EVENT_FINISHED_LOADING (the restore is over), or at exit
+// At OBS_FRONTEND_EVENT_FINISHED_LOADING (the restore is over), and at exit in
+// case OBS never finished loading. Removes the filter from every frame.
 void end_layout_restore();
 
 } // namespace luabridge::dock
