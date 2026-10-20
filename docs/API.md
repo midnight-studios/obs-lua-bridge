@@ -29,12 +29,41 @@ end
 
 Every function returns `ok, err` and never throws. **Without the plugin**, every call returns `false, "Lua Bridge plugin not available"` and does nothing, so the same script runs unchanged where the plugin isn't installed.
 
+**Using the helper installed with the plugin.** The plugin installs its own copy at `lua/luabridge.lua` in its data folder. A script that doesn't ship the helper can load that copy, preferring one next to the script:
+
+```lua
+-- Returns the helper, or nil when neither copy exists (no plugin: run without the bridge)
+local function load_bridge()
+	local path = script_path() .. "luabridge.lua"
+	local file = io.open(path, "r")
+	if not file then
+		local module = obslua.obs_get_module("obs-lua-bridge")
+		local data = module and obslua.obs_get_module_data_path(module)
+		if not data then
+			return nil
+		end
+		path = data .. "/lua/luabridge.lua"
+		file = io.open(path, "r")
+		if not file then
+			return nil
+		end
+	end
+	file:close()
+	local ok, bridge = pcall(dofile, path)
+	return ok and type(bridge) == "table" and bridge or nil
+end
+```
+
+- **The data path** is absolute on macOS, on Linux and in a Windows installation. In a portable Windows OBS it is relative to OBS's working directory (`../../data/obs-plugins/obs-lua-bridge`), which `io.open` and `dofile` resolve correctly.
+- **Tested** on Windows (installed and portable) only so far. A copy next to the script works everywhere.
+- **Versions:** the installed copy is the plugin's version of the helper. A newer helper works with an older plugin as long as `bridge.available()` says so.
+
 | Function | Purpose |
 |---|---|
 | `bridge.available()` | `true` if the plugin is installed and compatible, otherwise `false, reason` |
 | `bridge.unavailable_reason()` | `nil`, or why the plugin can't be used |
 | `bridge.info()` / `bridge.has(capability)` | The decoded `luabridge_get_info` table; whether a capability flag is `true` |
-| `bridge.register(owner, registration, options)` | Registration as a Lua table. `options`: `heartbeat` (default `true`), `heartbeat_interval` (seconds, default 10), `on_heartbeat(ok, err)`. Registering clears the owner's state. |
+| `bridge.register(owner, registration, options)` | Registration as a Lua table. `options`: `heartbeat` (default `true`), `heartbeat_interval` (seconds, default 10), `on_heartbeat(ok, err)`. Registering clears the owner's state. Registering an owner the script already registered (for example with a new dock layout) unregisters it first, so the plugin doesn't warn; its command handler stays (helper 1.0.1 and later). |
 | `bridge.unregister(owner)` | Removes an owner |
 | `bridge.on_command(owner, fn)` | `fn(command, args, origin)` for each command; `args` is a table |
 | `bridge.on_event(fn)` | `fn(owner, event, data)` for every `luabridge_emit` |
@@ -45,7 +74,7 @@ Every function returns `ok, err` and never throws. **Without the plugin**, every
 | `bridge.shutdown()` | Unregisters every owner of the script, stops the heartbeat, disconnects signals. Call it from `script_unload`. |
 | `bridge.json.encode(value)` / `bridge.json.decode(text)` | Pure-Lua JSON. Returns the result, or `nil, error`. |
 | `bridge.null`, `bridge.array(t)`, `bridge.object(t)` | JSON `null`, and markers for an empty array or object (an empty table encodes as `{}`) |
-| `bridge.VERSION`, `bridge.API_VERSION` | Helper version (`"1.0.0"`), and the plugin `api_version` it needs (1) |
+| `bridge.VERSION`, `bridge.API_VERSION` | Helper version (`"1.0.1"`), and the plugin `api_version` it needs (1) |
 
 **Automatic behaviour:**
 - **Heartbeat:** one shared timer sends a heartbeat for each owner (every 10 s by default), so an owner only goes stale if the script really stops.
@@ -166,6 +195,8 @@ Every script connected to `luabridge_command` receives every command, so filter 
 
 **Registering an owner that is already active** (registered and not stale) replaces it and logs a warning: `owner '<id>' was already registered and active; its registration was replaced (are two scripts using the same owner?)`. The call still succeeds. A script that reloads doesn't trigger it, because it unregisters first; neither does re-registering a stale owner. It usually means two scripts use the same owner ID.
 
+To change a registration while the script runs (for example a new dock layout), call `luabridge_unregister` and then `luabridge_register`. The helper does this for you from version 1.0.1. The owner's dock section keeps its place, and its dock keeps its contents.
+
 ## State
 
 `luabridge_set_state` takes a JSON object of key → value:
@@ -175,6 +206,8 @@ Every script connected to `luabridge_command` receives every command, so filter 
 - An owner can have at most 256 keys.
 
 An update is all-or-nothing: if any key is invalid or the limit would be exceeded, nothing changes. Registering again clears the owner's state.
+
+**A running clock: throttle the updates.** Every `luabridge_set_state` call that changes a key sends a `StateChanged` event to every websocket client subscribed to `Vendors`, and updates the docks. Publish only what the dock shows: for a timer, the whole seconds, at most every 200 ms or so, and at once when the displayed second changes. The StopWatch script does this, giving about one `StateChanged` a second with a whole-second time format, and about 4–5 a second when its format shows hundredths.
 
 ## Event data
 

@@ -91,7 +91,7 @@ the client stops.
 | Raw API and helper harnesses | load `tests/lua/test-harness.lua` and `tests/lua/helper-harness.lua` in Tools > Scripts; each prints `RESULT: n passed, 0 failed` to the log | test OBS | seconds |
 | Dock | `tests/lua/dock-test.lua` | test OBS, a person looking at the dock | 5 min |
 | Websocket API | `py tests/websocket/test_vendor.py` | `ws-companion.lua` loaded | 30 s |
-| Examples | `py tests/websocket/test_examples.py` | `scoreboard.lua`, `stopwatch-demo.lua` loaded | 30 s |
+| Examples | `py tests/websocket/test_examples.py` | `scoreboard.lua` and/or `stopwatch-demo.lua` (or StopWatch 6.2) loaded; each group is skipped when its owner isn't registered | 30 s |
 | Rate limiting | `py tests/websocket/test_rate_limit.py` | `ws-companion.lua`, `hello-bridge.lua` loaded | 15 s |
 | Ping-pong example | `py tests/websocket/test_ping_pong.py`, then `--close` | the "LuaBridge PingPong" and "LuaBridge Ping Only" collections (`setup_test_obs.py`) | 1 min |
 | Script docks (Windows) | `pwsh tests/ui/script_docks.ps1 [-Root C:\obs-test]` (`-Legacy33` for an OBS 33 copy with the plugin in `<Root>\_legacy`) | OBS closed; the "LuaBridge Docks", "LuaBridge B" and "LuaBridge Empty" collections and the "LuaBridge P2" profile (`setup_test_obs.py`) | 7 min |

@@ -5,8 +5,8 @@ All notable changes to Lua Bridge. Versions follow
 `api_version` (currently 1), see `docs/API.md`.
 
 ## Unreleased: 0.9.0-beta2
-**Requires OBS Studio 31.1 or newer.** No changes to the script API (`api_version` 1), `luabridge.lua` or the
-websocket requests.
+**Requires OBS Studio 31.1 or newer.** No changes to the script API (`api_version` 1) or the websocket requests.
+`luabridge.lua` is now version 1.0.1 (see below); it works with 0.9.0-beta1 too.
 
 ### Per-script docks
 - **Tools → Lua Bridge** opens the **Lua Bridge Docks** window. Tick **Dock** to give a script (an owner) a dock of
@@ -25,6 +25,21 @@ websocket requests.
   Closing a dock yourself still shows OBS's notice, as for any dock. This affected the Lua Bridge dock in 0.9.0-beta1
   too.
 
+### Lua helper 1.0.1
+- `bridge.register` for an owner the script already registered (for example to change its dock layout) unregisters
+  it first, so the plugin no longer logs `owner '<id>' was already registered and active` for it. That warning is
+  kept for two scripts using the same owner. The command handler stays, and the owner's dock section keeps its
+  place. Same functions and behaviour otherwise; `api_version` stays 1, and the helper works with the 0.9.0-beta1
+  plugin. Scripts that ship their own copy of 1.0.0 keep working unchanged.
+
+### StopWatch
+- StopWatch 6.2 ([midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua)) implements the Lua Bridge
+  contract. `docs/integrations/stopwatch.md` now describes what the real script does (reset to the start time,
+  `elapsed` while counting down, `display` always `HH:MM:SS`), links StopWatch's own guide, and says where its
+  docks are. `stopwatch-demo.lua` stays as a demo; don't run both, since they share the owner `stopwatch`.
+- `tests/websocket/test_examples.py` runs the Stopwatch tests whenever the owner `stopwatch` is registered, without
+  needing `scoreboard.lua`, so they run against StopWatch on its own.
+
 ### OBS Forum resource policy
 - **Name:** the plugin is now called **Lua Bridge** everywhere users see it (README, docs, package metadata, the
   example scripts' descriptions, release titles). OBS's Plugin Manager now shows "Lua Bridge" instead of the file
@@ -42,6 +57,8 @@ websocket requests.
 - **Ubuntu:** the `.deb` has a real description and a homepage instead of CPack's default text.
 
 ### Docs
+- API.md: how a script loads the helper installed with the plugin (`obs_get_module_data_path`), how to change a
+  registration while running (unregister, then register), and a tip to throttle `set_state` for a running clock.
 - INSTALL.md has a FAQ: the dock starts hidden (Docks → Lua Bridge), and OBS 33's Plugin Manager labels Lua
   Bridge "Legacy" (it still works; the README mentions it too).
 

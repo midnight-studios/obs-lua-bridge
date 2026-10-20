@@ -44,7 +44,7 @@ local obs = obslua
 
 local M = {}
 
-M.VERSION = "1.0.0"
+M.VERSION = "1.0.1"
 -- The plugin api_version this helper is written for. Newer plugins are fine
 -- (API changes within a major version are additive); older ones are not.
 M.API_VERSION = 1
@@ -648,6 +648,10 @@ end
 --   heartbeat_interval = 10   seconds
 --   on_heartbeat = fn(ok, err) called after each heartbeat (e.g. to show it)
 -- Registering clears the owner's state in the plugin (and in this helper).
+-- Registering an owner this script already registered (for example to change
+-- its dock) unregisters it first, so the plugin doesn't log that the owner was
+-- already registered and active; that message is kept for two scripts using
+-- the same owner. Its command handler stays.
 function M.register(owner, registration, options)
 	if type(owner) ~= "string" then
 		return false, "owner must be a string"
@@ -657,6 +661,9 @@ function M.register(owner, registration, options)
 		return false, err
 	end
 	local ok
+	if owners[owner] then
+		proc("luabridge_unregister", { owner = owner })
+	end
 	ok, err = proc("luabridge_register", { owner = owner, json = text })
 	if not ok then
 		return false, err
