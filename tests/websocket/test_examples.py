@@ -5,6 +5,10 @@ lua/examples/scoreboard.lua and lua/examples/stopwatch-demo.lua in
 Tools > Scripts of the test OBS. Commands are addressed by owner id only
 ("scoreboard", "stopwatch"), never by script filename.
 
+Each group runs when its owner is registered and is skipped otherwise, so the
+Stopwatch tests also run on their own, for example against the real StopWatch
+script (owner "stopwatch") instead of the demo.
+
 Run:  py tests/websocket/test_examples.py   (repeatable; restores what it changes)
 """
 
@@ -32,13 +36,12 @@ class ExampleTests(unittest.TestCase):
             cls.events = Events()
         except Exception as exc:
             raise unittest.SkipTest(connect_error(exc)) from None
-        owners = {o["owner"] for o in call(cls.client, "ListOwners").get("owners", [])}
-        missing = {"scoreboard", "stopwatch"} - owners
-        if missing:
+        cls.owners = {o["owner"] for o in call(cls.client, "ListOwners").get("owners", [])}
+        if not {"scoreboard", "stopwatch"} & cls.owners:
             cls.tearDownClass()
             raise unittest.SkipTest(
-                "load lua/examples/scoreboard.lua and lua/examples/stopwatch-demo.lua in Tools > Scripts "
-                f"(not registered: {', '.join(sorted(missing))})"
+                "load lua/examples/scoreboard.lua and/or lua/examples/stopwatch-demo.lua in Tools > Scripts "
+                "(neither 'scoreboard' nor 'stopwatch' is registered)"
             )
 
     @classmethod
@@ -50,6 +53,10 @@ class ExampleTests(unittest.TestCase):
 
     def setUp(self):
         self.events.clear()
+
+    def require(self, owner, script):
+        if owner not in self.owners:
+            self.skipTest(f"owner '{owner}' not registered (load {script})")
 
     def state(self, owner):
         response = call(self.client, "GetState", {"owner": owner})
@@ -72,6 +79,7 @@ class ExampleTests(unittest.TestCase):
     # Score Board ---------------------------------------------------------
 
     def test_scoreboard_state_and_events(self):
+        self.require("scoreboard", "lua/examples/scoreboard.lua")
         start = self.state("scoreboard")
         home, away = start.get("home", 0), start.get("away", 0)
 
@@ -102,6 +110,7 @@ class ExampleTests(unittest.TestCase):
         self.wait_for("scoreboard", lambda s: s.get("home") == home and s.get("away") == away)
 
     def test_scoreboard_rejects_unknown_commands(self):
+        self.require("scoreboard", "lua/examples/scoreboard.lua")
         response = run(self.client, "scoreboard", "home_plus_two")
         self.assertIs(response["ok"], False)
         self.assertIn("unknown command", response["error"])
@@ -109,6 +118,7 @@ class ExampleTests(unittest.TestCase):
     # Stopwatch -----------------------------------------------------------
 
     def test_stopwatch_by_owner(self):
+        self.require("stopwatch", "lua/examples/stopwatch-demo.lua or the StopWatch script")
         self.assert_accepted(run(self.client, "stopwatch", "reset"))
         state = self.wait_for("stopwatch", lambda s: s.get("elapsed") == 0 and s.get("running") is False)
         self.assertEqual(state["display"], "00:00:00")
@@ -136,6 +146,7 @@ class ExampleTests(unittest.TestCase):
         self.wait_for("stopwatch", lambda s: s.get("elapsed") == 0 and s.get("running") is False)
 
     def test_stopwatch_validates_args(self):
+        self.require("stopwatch", "lua/examples/stopwatch-demo.lua or the StopWatch script")
         response = run(self.client, "stopwatch", "add", {"seconds": "ten"})
         self.assertIs(response["ok"], False)
         self.assertIn("argument 'seconds' must be int", response["error"])

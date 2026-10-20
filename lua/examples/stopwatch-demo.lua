@@ -4,11 +4,11 @@
 -- Copyright (c) 2026 Midnight Studios. See lua/LICENSE (MIT); the plugin itself is GPL-2.0-or-later.
 --
 -- DEMO ONLY. This is not the StopWatch script from midnight-studios/obs-lua.
--- It implements the same Lua Bridge contract (owner "stopwatch"; see
--- docs/integrations/stopwatch.md), so dock layouts and websocket clients built
--- against it keep working with the real script once it adopts the
--- integration. Don't run this demo and the real StopWatch at the same time:
--- both use the owner "stopwatch".
+-- StopWatch 6.2 and later implement the same Lua Bridge contract (owner
+-- "stopwatch"; see docs/integrations/stopwatch.md), so dock layouts and
+-- websocket clients built against this demo work with the real script. For a
+-- real stopwatch, use StopWatch. Don't run this demo and the real StopWatch at
+-- the same time: both use the owner "stopwatch".
 --
 -- With the plugin: a "Stopwatch (demo)" section in Docks > Lua Bridge with a
 -- live display, Start/Pause (its label follows the state via label_bind),

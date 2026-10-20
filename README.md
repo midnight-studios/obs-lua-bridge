@@ -60,7 +60,9 @@ The `.tar.xz` is a manual alternative; see [INSTALL.md](docs/INSTALL.md#macos).
 They ship with the plugin in `lua/examples/`, and are also available on their own as `obs-lua-bridge-lua-<version>.zip`:
 - **hello-bridge**: the smallest example, a Ping button and a label.
 - **scoreboard**: a score board with +/- buttons that also sends a `score.changed` event.
-- **stopwatch-demo**: a stopwatch controlled from the dock, shown in a text source.
+- **stopwatch-demo**: a stopwatch controlled from the dock, shown in a text source. A demo of the contract that the
+  real [StopWatch](docs/integrations/stopwatch.md) script (6.2 and later) implements; don't run both, since they share
+  the owner `stopwatch`.
 - **ping-pong**: two scripts talking to each other, with commands one way and events back.
 
 ## Using a Stream Deck

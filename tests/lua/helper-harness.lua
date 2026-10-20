@@ -108,7 +108,17 @@ function script_load(settings)
 	check("set_state after an outside unregister re-registers and succeeds", ok, err)
 	local raw_ok, raw_err = raw("luabridge_set_state", { owner = OWNER, json = "{}" })
 	check("owner is registered again", raw_ok, raw_err)
-	check("run_command after re-registration", bridge.run_command(OWNER, "echo", { msg = "again" }))
+
+	-- Registering again from this script, e.g. with a new dock layout (helper 1.0.1
+	-- unregisters first, so the plugin logs no "already registered" warning); the
+	-- command handler must stay, which the delivered "again" command below shows
+	ok, err = bridge.register(OWNER, {
+		display_name = "Helper Harness",
+		commands = { { id = "echo", args = { msg = "string" } } },
+		dock = { { type = "label", bind = "status" }, { type = "label", bind = "count" } },
+	}, { heartbeat = false })
+	check("registering again from the same script", ok, err)
+	check("run_command after re-registration",bridge.run_command(OWNER, "echo", { msg = "again" }))
 
 	log("checking delivered signals in 2 seconds...")
 	obs.timer_add(check_received, 2000)

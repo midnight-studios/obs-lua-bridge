@@ -450,6 +450,29 @@ function tests.shutdown_cleans_up(fake, load)
 	eq(#fake.calls_to("luabridge_unregister"), 2, "idempotent")
 end
 
+-- Registering an owner again from the same script (e.g. a new dock layout)
+-- unregisters it first; a first registration doesn't
+function tests.reregistering_unregisters_first(fake, load)
+	local bridge = load()
+	eq(bridge.register("a", { display_name = "A" }), true)
+	eq(#fake.calls_to("luabridge_unregister"), 0, "first registration: no unregister")
+	local got = 0
+	bridge.on_command("a", function() got = got + 1 end)
+	eq(bridge.register("a", { display_name = "A", dock = { { type = "label", text = "new" } } }), true)
+	local names = {}
+	for _, c in ipairs(fake.calls) do
+		if c.name == "luabridge_register" or c.name == "luabridge_unregister" then
+			names[#names + 1] = c.name
+		end
+	end
+	eq(table.concat(names, ","), "luabridge_register,luabridge_unregister,luabridge_register", "unregister, then register")
+	eq(fake.calls_to("luabridge_unregister")[1].args.owner, "a")
+	truthy(fake.calls_to("luabridge_register")[2].args.json:find('"new"', 1, true), "the new registration is sent")
+	fake.send_command("a", "go", "{}", "dock")
+	eq(got, 1, "the command handler stays")
+	truthy(fake.timer(), "heartbeat still running")
+end
+
 function tests.unregister_stops_heartbeat_and_dispatch(fake, load)
 	local bridge = load()
 	bridge.register("a", { display_name = "A" })
