@@ -26,6 +26,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "rate-limit.hpp"
 #include "state-events.hpp"
 #include "registry.hpp"
+#include "script-docks-config.hpp"
 
 #include <cstdio>
 #include <memory>
@@ -923,6 +924,113 @@ void test_threads()
 	CHECK(f.reg.owner_count() == 0);
 }
 
+void test_script_docks()
+{
+	using namespace script_docks;
+
+	// Dock ids and titles
+	CHECK(dock_id("stopwatch") == "luabridge.stopwatch");
+	CHECK(dock_id("stopwatch.2") == "luabridge.stopwatch.2");
+	CHECK(dock_title({"sw", "", ""}) == "sw");
+	CHECK(dock_title({"sw", "", "StopWatch"}) == "StopWatch");
+	CHECK(dock_title({"sw", "Timer", "StopWatch"}) == "Timer");
+
+	CHECK(clean_title("  Big\tTimer\n ") == "BigTimer");
+	CHECK(clean_title("") == "");
+	CHECK(clean_title("   ") == "");
+	CHECK(clean_title("Zeitmesser \xc3\xa4") == "Zeitmesser \xc3\xa4");
+	CHECK(clean_title(repeat('a', 200)).size() == max_title);
+	// A 2-byte character across the limit is dropped whole, not cut in half
+	std::string cut = clean_title(repeat('a', max_title - 1) + "\xc3\xa4" + "b");
+	CHECK(cut == repeat('a', max_title - 1));
+
+	// Adding, the cap, removing
+	Config config;
+	CHECK(add_dock(config, "sw", "StopWatch") == AddResult::added);
+	CHECK(add_dock(config, "sw", "StopWatch") == AddResult::already_added);
+	CHECK(add_dock(config, "Bad Id", "x") == AddResult::invalid_owner);
+	CHECK(add_dock(config, "", "x") == AddResult::invalid_owner);
+	for (std::size_t i = 1; i < max_docks; ++i)
+		CHECK(add_dock(config, "o" + std::to_string(i), "O") == AddResult::added);
+	CHECK(config.docks.size() == max_docks);
+	CHECK(add_dock(config, "one.too.many", "x") == AddResult::limit_reached);
+	CHECK(remove_dock(config, "o5"));
+	CHECK(!remove_dock(config, "o5"));
+	CHECK(add_dock(config, "one.too.many", "x") == AddResult::added);
+	CHECK(config.docks.front().owner == "sw" && config.docks.back().owner == "one.too.many");
+
+	CHECK(note_display_name(config, "sw", "StopWatch 2"));
+	CHECK(!note_display_name(config, "sw", "StopWatch 2"));
+	CHECK(!note_display_name(config, "sw", ""));
+	CHECK(!note_display_name(config, "nobody", "X"));
+	CHECK(find_dock(config, "sw")->display_name == "StopWatch 2");
+
+	// Round trip
+	Config small;
+	add_dock(small, "sw", "StopWatch");
+	find_dock(small, "sw")->title = "Timer \xc3\xa4";
+	add_dock(small, "ping", "");
+	std::string text = dump_config(small);
+	CHECK(text.find("\"version\": 1") != std::string::npos);
+	ParseResult parsed = parse_config(text);
+	CHECK(parsed.ok && parsed.warnings.empty());
+	CHECK(parsed.config.docks.size() == 2);
+	CHECK(parsed.config.docks.size() == 2 && parsed.config.docks[0].owner == "sw" &&
+	      parsed.config.docks[0].title == "Timer \xc3\xa4" && parsed.config.docks[0].display_name == "StopWatch" &&
+	      parsed.config.docks[1].owner == "ping" && parsed.config.docks[1].title.empty());
+
+	// Unusable files
+	CHECK(!parse_config("").ok);
+	CHECK(!parse_config("{broken").ok);
+	CHECK(!parse_config("[]").ok);
+	CHECK(!parse_config(R"({"docks":[]})").ok);
+	CHECK(!parse_config(R"({"version":"1","docks":[]})").ok);
+	CHECK(parse_config(R"({"version":1.0})").error == "unsupported version 1.0");
+	ParseResult newer = parse_config(R"({"version":2,"docks":[{"owner":"sw"}]})");
+	CHECK(!newer.ok && newer.error == "unsupported version 2" && newer.config.docks.empty());
+	CHECK(!parse_config(R"({"version":1,"docks":{}})").ok);
+	CHECK(parse_config(R"({"version":1})").ok);
+
+	// Bad entries are skipped with a warning; the rest is kept
+	ParseResult mixed = parse_config(
+		R"({"version":1,"docks":[{"owner":"sw"},{"owner":"sw","title":"dup"},{"owner":"Bad Id"},5,{},)"
+		R"({"owner":"t","title":7,"display_name":"  T  "},{"owner":"u","title":null}]})");
+	CHECK(mixed.ok);
+	CHECK(mixed.warnings.size() == 5);
+	CHECK(mixed.config.docks.size() == 3);
+	CHECK(mixed.config.docks.size() == 3 && mixed.config.docks[0].title.empty() &&
+	      mixed.config.docks[1].owner == "t" && mixed.config.docks[1].title.empty() &&
+	      mixed.config.docks[1].display_name == "T" && mixed.config.docks[2].owner == "u");
+
+	std::string many = R"({"version":1,"docks":[)";
+	for (std::size_t i = 0; i < max_docks + 3; ++i)
+		many += std::string(i ? "," : "") + R"({"owner":"o)" + std::to_string(i) + "\"}";
+	many += "]}";
+	ParseResult capped = parse_config(many);
+	CHECK(capped.ok && capped.config.docks.size() == max_docks && capped.warnings.size() == 3);
+
+	// Manager rows: registered owners and docked owners that aren't registered
+	Config docked;
+	add_dock(docked, "sw", "StopWatch (saved)");
+	find_dock(docked, "sw")->title = "Timer";
+	add_dock(docked, "gone", "Gone Script");
+	add_dock(docked, "nameless", "");
+	std::vector<OwnerSummary> owners = {{"alpha", "Alpha", false, 1}, {"sw", "StopWatch", true, 2}};
+	auto rows = manager_rows(docked, owners);
+	CHECK(rows.size() == 4);
+	if (rows.size() == 4) {
+		CHECK(rows[0].owner == "alpha" && rows[0].display_name == "Alpha" &&
+		      rows[0].status == OwnerStatus::running && !rows[0].docked && rows[0].title.empty());
+		CHECK(rows[1].owner == "gone" && rows[1].display_name == "Gone Script" &&
+		      rows[1].status == OwnerStatus::not_loaded && rows[1].docked);
+		CHECK(rows[2].owner == "nameless" && rows[2].display_name == "nameless" &&
+		      rows[2].status == OwnerStatus::not_loaded);
+		CHECK(rows[3].owner == "sw" && rows[3].display_name == "StopWatch" &&
+		      rows[3].status == OwnerStatus::not_responding && rows[3].docked && rows[3].title == "Timer");
+	}
+	CHECK(manager_rows({}, {}).empty());
+}
+
 } // namespace
 
 int main()
@@ -949,6 +1057,7 @@ int main()
 	test_dock_logic();
 	test_state_events();
 	test_snapshots();
+	test_script_docks();
 	test_threads();
 
 	std::printf("registry-tests: %d checks, %d failed\n", checks, failures);

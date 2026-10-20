@@ -24,6 +24,7 @@ add_library(
   src/dock-logic.cpp
   src/rate-limit.cpp
   src/log-limiter.cpp
+  src/script-docks-config.cpp
 )
 target_include_directories(${CMAKE_PROJECT_NAME}-core PUBLIC src)
 target_link_libraries(${CMAKE_PROJECT_NAME}-core PUBLIC nlohmann_json::nlohmann_json)
@@ -65,8 +66,11 @@ target_sources(
     src/signals.cpp
     src/websocket-vendor.cpp
     src/dock/dock-events.cpp
+    src/dock/dock-frame.cpp
+    src/dock/docks-window.cpp
     src/dock/lua-bridge-dock.cpp
     src/dock/owner-section.cpp
+    src/dock/script-docks.cpp
 )
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
@@ -117,6 +121,7 @@ if(ENABLE_FUZZING)
     src/dock-logic.cpp
     src/rate-limit.cpp
     src/log-limiter.cpp
+    src/script-docks-config.cpp
   )
   target_include_directories(registry-fuzz PRIVATE src)
   target_link_libraries(registry-fuzz PRIVATE nlohmann_json::nlohmann_json)

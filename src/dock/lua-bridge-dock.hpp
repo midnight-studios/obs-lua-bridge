@@ -19,9 +19,11 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #pragma once
 
 // The "Lua Bridge" dock (spec M3): one collapsible section per registered
-// owner, a placeholder when there are none. Everything here runs on the UI
+// owner, a placeholder when there are none. A script dock is the same widget
+// limited to one owner, with a placeholder while that owner isn't registered. Everything here runs on the UI
 // thread; other threads reach it only through DockEvents (Qt::QueuedConnection).
 
+#include <functional>
 #include <map>
 #include <string>
 
@@ -31,6 +33,7 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include "event-sink.hpp"
 #include "registry.hpp"
 
+class QLabel;
 class QScrollArea;
 class QStackedWidget;
 class QVBoxLayout;
@@ -42,8 +45,17 @@ class OwnerSection;
 class LuaBridgeDock : public QWidget {
 public:
 	// events: where the dock's own Remove action is announced (all sinks,
-	// including this dock's DockEvents and the websocket vendor)
-	LuaBridgeDock(Registry &registry, Emitter &emitter, EventSink &events, QWidget *parent = nullptr);
+	// including this dock's DockEvents and the websocket vendor). owner: show only
+	// this owner (a script dock); empty: every owner (the combined dock).
+	LuaBridgeDock(Registry &registry, Emitter &emitter, EventSink &events, std::string owner = {},
+		      QWidget *parent = nullptr);
+
+	// Script dock: called (UI thread) when its owner registers with a display
+	// name different from the last one seen
+	void on_display_name(std::function<void(const std::string &)> callback);
+	// Script dock: its owner already registered earlier this session (a dock
+	// re-added in the same session then says "not running", not "waiting")
+	void set_owner_seen();
 
 	// Rebuilds the sections from the registry on the next event-loop pass;
 	// several calls before then collapse into one reconcile
@@ -64,7 +76,13 @@ private:
 	Emitter &emitter_;
 	EventSink &events_;
 
+	const std::string owner_filter_; // empty: all owners
+	bool owner_seen_ = false;        // script dock: its owner registered this session
+	std::string display_name_;
+	std::function<void(const std::string &)> display_name_callback_;
+
 	QStackedWidget *stack_ = nullptr;
+	QLabel *placeholder_ = nullptr;
 	QScrollArea *scroll_ = nullptr;
 	QVBoxLayout *sections_layout_ = nullptr; // sections, then a stretch
 

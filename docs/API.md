@@ -233,7 +233,7 @@ For `emit` and `run_command`, an empty `json` counts as `{}`. `run_command` chec
 
 ## The dock
 
-The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one collapsible section per registered owner, titled with its `display_name`, in registration order. OBS remembers the dock's position, size and visibility. When no owner is registered, the dock shows a short placeholder text.
+The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one collapsible section per registered owner, titled with its `display_name`, in registration order. OBS remembers the dock's position, size and visibility. When no owner is registered, the dock shows a short placeholder text. Users can also give a script a dock of its own (see [A dock per script](#a-dock-per-script)).
 
 **How the controls appear:**
 
@@ -258,6 +258,20 @@ The plugin adds one dock, **Lua Bridge** (Docks → Lua Bridge). It has one coll
 - A **Remove** button appears in the section's title. It unregisters the owner, exactly like `luabridge_unregister`: the section disappears, and websocket clients no longer list the owner. This clears sections left behind by scripts that crashed or were removed without unregistering.
 - If the script is still running, its `set_state`/`emit` calls now fail with `owner not registered`. That's the cue to call `luabridge_register` again, after which the section reappears.
 - Only stale sections can be removed from the dock.
+
+### A dock per script
+
+**Tools → Lua Bridge** opens the **Lua Bridge Docks** window. It lists every registered owner with its display name, owner ID and status: **Running**, **Not responding** (stale), or **Not loaded** (it has a dock but isn't registered). Tick **Dock** to give that owner a dock of its own:
+- The dock is listed in the Docks menu like any other and shows the owner's section, with the same controls as in the Lua Bridge dock. Its title is the **Dock title** typed in the window, or the owner's `display_name` when that's empty. A new title applies at once. (The plugin renames the dock frame OBS wraps it in. If a future OBS wraps docks differently, the plugin doesn't rename it live; it logs `the new title applies when OBS restarts`, and the saved title is used from the next start.)
+- A new dock opens as a floating window over OBS; move or dock it where you want. From then on OBS remembers its position, size and visibility, the same in every profile and scene collection.
+- Until the owner registers, the dock says it's waiting for the script. After the owner unregisters (the script was removed, or isn't in the current scene collection), it says the script isn't running. An owner that stops responding is greyed out with **Remove**, as in the Lua Bridge dock; **Remove** unregisters the owner and keeps the dock.
+- Untick **Dock** to remove the dock. Up to 32 owners can have their own dock.
+- The Lua Bridge dock keeps showing every owner. To hide it, untick it in the Docks menu.
+- Keyboard: in the window, **Space** ticks **Dock** and **F2** edits the title.
+
+A dock belongs to an owner ID, so it survives script reloads and OBS restarts, and two copies of a script with different instance IDs can each have one. Scripts need no code for this; there is no API for it.
+
+The choice is saved in `docks.json` in the plugin's config folder (`<OBS config>/plugin_config/obs-lua-bridge/`). If that file can't be read, it's renamed to `docks.json.invalid`, the reason is logged, and OBS starts without script docks.
 
 ## obs-websocket vendor API
 

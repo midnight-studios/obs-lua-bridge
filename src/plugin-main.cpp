@@ -20,8 +20,15 @@ with this program. If not, see <https://www.gnu.org/licenses/>
 #include <obs-frontend-api.h>
 #include <plugin-support.h>
 
+#include <memory>
+
+#include <QPointer>
+
 #include "dock/dock-events.hpp"
+#include "dock/dock-frame.hpp"
+#include "dock/docks-window.hpp"
 #include "dock/lua-bridge-dock.hpp"
+#include "dock/script-docks.hpp"
 #include "fan-out-sink.hpp"
 #include "procs.hpp"
 #include "signals.hpp"
@@ -35,8 +42,11 @@ namespace {
 constexpr const char *dock_id = "lua-bridge";
 bool dock_added = false;
 luabridge::dock::LuaBridgeDock *dock_widget = nullptr; // owned by OBS once added
+std::unique_ptr<luabridge::dock::ScriptDocks> script_docks;
+QPointer<luabridge::dock::DocksWindow> docks_window; // Tools > Lua Bridge; deletes itself on close
+bool exiting = false;
 
-// Notifications go to obs-websocket clients and to the dock
+// Notifications go to obs-websocket clients and to the docks
 luabridge::EventSink &event_sinks()
 {
 	static luabridge::FanOutEventSink sinks{&luabridge::websocket::events(), &luabridge::dock::events()};
@@ -54,12 +64,45 @@ void create_dock()
 	}
 	dock_added = true;
 	dock_widget = dock;
+	luabridge::dock::guard_layout_restore(dock);
 	luabridge::dock::attach_events(dock);
 }
 
-void remove_dock()
+// Saved script docks are created here, in obs_module_load: OBS restores dock
+// layouts once, after all modules have loaded
+void create_script_docks()
 {
-	luabridge::dock::detach_events();
+	script_docks = std::make_unique<luabridge::dock::ScriptDocks>(luabridge::registry(),
+								      luabridge::signaling::emitter(), event_sinks());
+	script_docks->load();
+}
+
+void open_docks_window(void *)
+{
+	// The menu item can't be removed, so it may still be clicked during exit
+	if (exiting || !script_docks)
+		return;
+	if (!docks_window) {
+		auto *main = static_cast<QWidget *>(obs_frontend_get_main_window());
+		docks_window = new luabridge::dock::DocksWindow(*script_docks, luabridge::registry(), main);
+		docks_window->setAttribute(Qt::WA_DeleteOnClose);
+	}
+	docks_window->show();
+	docks_window->raise();
+	docks_window->activateWindow();
+}
+
+void remove_docks()
+{
+	// The window uses script_docks, so it goes first
+	delete docks_window.data();
+	if (script_docks) {
+		script_docks->remove_all();
+		script_docks.reset();
+	}
+
+	if (dock_widget)
+		luabridge::dock::detach_events(dock_widget);
 	if (dock_added) {
 		// An open confirm must not run its command (or outlive its parent) at exit
 		dock_widget->close_dialogs();
@@ -76,6 +119,7 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 {
 	switch (event) {
 	case OBS_FRONTEND_EVENT_FINISHED_LOADING:
+		luabridge::dock::end_layout_restore();
 		luabridge::signaling::emitter().ready(luabridge::info_json());
 		break;
 	case OBS_FRONTEND_EVENT_EXIT:
@@ -84,7 +128,9 @@ void on_frontend_event(enum obs_frontend_event event, void *)
 		luabridge::signaling::begin_shutdown();
 		// obs-websocket unloads before this plugin; stop using it now
 		luabridge::websocket::stop();
-		remove_dock();
+		exiting = true;
+		luabridge::dock::end_layout_restore();
+		remove_docks();
 		break;
 	default:
 		break;
@@ -115,6 +161,8 @@ bool obs_module_load(void)
 	luabridge::enable_procs();
 
 	create_dock();
+	create_script_docks();
+	obs_frontend_add_tools_menu_item(obs_module_text("LuaBridge.Tools.MenuItem"), open_docks_window, nullptr);
 	obs_frontend_add_event_callback(on_frontend_event, nullptr);
 
 	obs_log(LOG_INFO, "plugin loaded successfully (version %s)", PLUGIN_VERSION);
@@ -135,7 +183,7 @@ void obs_module_unload(void)
 	luabridge::disable_procs();
 	luabridge::signaling::stop();
 	luabridge::registry().clear();
-	// The frontend event callback is not removed, and the dock was already
+	// The frontend event callback is not removed, and the docks were already
 	// removed at OBS_FRONTEND_EVENT_EXIT: the frontend API is gone by now.
 	obs_log(LOG_INFO, "plugin unloaded");
 }

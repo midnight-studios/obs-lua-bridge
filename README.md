@@ -5,7 +5,8 @@
 Lua Bridge is an independent plugin for OBS Studio and not a product of the OBS Project.
 
 Lua Bridge gives your OBS Lua scripts what OBS's own scripting can't do:
-- **Controls in a dock:** buttons, labels, number and text inputs, and toggles in **Docks → Lua Bridge**.
+- **Controls in a dock:** buttons, labels, number and text inputs, and toggles in **Docks → Lua Bridge**, or in a
+  dock of its own for each script you choose (**Tools → Lua Bridge**).
 - **Commands:** from that dock, from other scripts, or from obs-websocket 5 tools. Confirmed so far: Bitfocus Companion. See [control surfaces](docs/integrations/control-surfaces.md).
 - **Live state and custom events** that other scripts and websocket clients can follow.
 

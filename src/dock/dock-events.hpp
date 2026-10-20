@@ -28,11 +28,12 @@ namespace luabridge::dock {
 
 class LuaBridgeDock;
 
-// Starts forwarding to dock (UI thread, after the dock is created)
+// Starts forwarding to dock (UI thread, after the dock is created). Every
+// attached dock (the combined one and each script dock) gets every event.
 void attach_events(LuaBridgeDock *dock);
-// Stops forwarding; call on the UI thread before the dock is destroyed.
+// Stops forwarding to dock; call on the UI thread before it is destroyed.
 // Calls already posted to the dock are dropped by Qt when it is deleted.
-void detach_events();
+void detach_events(LuaBridgeDock *dock);
 
 // Always valid; does nothing while no dock is attached
 EventSink &events();

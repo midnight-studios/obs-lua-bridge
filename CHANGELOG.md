@@ -8,6 +8,23 @@ All notable changes to Lua Bridge. Versions follow
 **Requires OBS Studio 31.1 or newer.** No changes to the script API (`api_version` 1), `luabridge.lua` or the
 websocket requests.
 
+### Per-script docks
+- **Tools → Lua Bridge** opens the **Lua Bridge Docks** window. Tick **Dock** to give a script (an owner) a dock of
+  its own, listed in the Docks menu, with an optional title. Up to 32. OBS remembers each dock's position, size and
+  visibility, the same in every profile and scene collection. A dock waits for its script, says when the script
+  isn't running, and keeps **Remove** for a script that stopped responding. The Lua Bridge dock still shows every
+  script. Scripts need no changes. See "A dock per script" in `docs/API.md`.
+- The chosen docks are saved in `docks.json` in the plugin's config folder; an unreadable file is set aside as
+  `docks.json.invalid`.
+
+### Fixed
+- **OBS's "Closing Dockable Window" notice at startup.** On OBS 32.2 and later (Qt 6.11), a Lua Bridge dock that was
+  docked in the main window and closed with its X made OBS show this notice again at the next start, although
+  nobody had closed anything. OBS's own docks do the same (the Stats dock, for example). Lua Bridge's docks now
+  ignore the close event that OBS's layout restore sends them at startup; the dock stays closed, as it was left.
+  Closing a dock yourself still shows OBS's notice, as for any dock. This affected the Lua Bridge dock in 0.9.0-beta1
+  too.
+
 ### OBS Forum resource policy
 - **Name:** the plugin is now called **Lua Bridge** everywhere users see it (README, docs, package metadata, the
   example scripts' descriptions, release titles). OBS's Plugin Manager now shows "Lua Bridge" instead of the file

@@ -35,6 +35,7 @@ add_library(
   ${_src}/dock-logic.cpp
   ${_src}/rate-limit.cpp
   ${_src}/log-limiter.cpp
+  ${_src}/script-docks-config.cpp
 )
 target_include_directories(obs-lua-bridge-core PUBLIC ${_src})
 target_link_libraries(obs-lua-bridge-core PUBLIC nlohmann_json::nlohmann_json)
