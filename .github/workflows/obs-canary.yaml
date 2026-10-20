@@ -57,7 +57,10 @@ jobs:
         include:
           - os: windows-2022
             target: x64
-          - os: macos-15
+          # A new OBS release can require a newer Xcode than the release builds use (OBS 32.2.2 requires
+          # Xcode 26.5, issue #8), so the canary uses the newest macOS runner and the Xcode version that
+          # OBS release requires. Release builds keep the Xcode that the pinned OBS needs.
+          - os: macos-26
             target: macos-universal
     runs-on: ${{ matrix.os }}
     defaults:
@@ -98,9 +101,24 @@ jobs:
           rm obs-presets.json obs-deps.json
           jq '.dependencies | map_values(.version)' buildspec.json
 
-      - name: Enable Xcode 16.1 🍏
+      - name: Enable the Xcode That OBS Requires 🍏
         if: runner.os == 'macOS'
-        run: sudo xcode-select --switch /Applications/Xcode_16.1.0.app/Contents/Developer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OBS_VERSION: ${{ needs.check.outputs.latest }}
+        run: |
+          : Enable the Xcode That OBS Requires 🍏
+          set -euo pipefail
+          # OBS checks for this Xcode version in cmake/macos/compilerconfig.cmake
+          xcode="$(gh api "repos/obsproject/obs-studio/contents/cmake/macos/compilerconfig.cmake?ref=${OBS_VERSION}" \
+            -H 'Accept: application/vnd.github.raw' | sed -nE 's/.*set\(obs_macos_minimum_xcode ([0-9.]+)\).*/\1/p')"
+          echo "OBS ${OBS_VERSION} requires Xcode ${xcode:-(not found)}"
+          if [[ -z "${xcode}" || ! -d "/Applications/Xcode_${xcode}.app" ]]; then
+            echo "::error::Xcode ${xcode:-(unknown)} isn't installed on this runner: $(ls -d /Applications/Xcode_*.app | xargs -n1 basename | tr '\n' ' ')"
+            exit 1
+          fi
+          sudo xcode-select --switch "/Applications/Xcode_${xcode}.app/Contents/Developer"
+          xcodebuild -version
 
       - name: Build Plugin 🧱
         uses: ./.github/actions/build-plugin

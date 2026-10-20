@@ -48,9 +48,12 @@ if(ENABLE_QT)
     ${CMAKE_PROJECT_NAME}
     PRIVATE $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-quoted-include-in-framework-header -Wno-comma>
   )
+  # AUTOMOC_COMPILER_PREDEFINES OFF: under Xcode 26 (needed for OBS 32.2.2), AUTOMOC's compiler call fails
+  # with "conflicting deployment targets" (issue #8). The plugin has no Q_OBJECT classes, so moc needs no
+  # compiler predefines.
   set_target_properties(
     ${CMAKE_PROJECT_NAME}
-    PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON
+    PROPERTIES AUTOMOC ON AUTOUIC ON AUTORCC ON AUTOMOC_COMPILER_PREDEFINES OFF
   )
 endif()
 
