@@ -58,6 +58,13 @@ function Package {
 
     Remove-Item @RemoveArgs
 
+    # Lua Bridge: StopWatch (lua/stopwatch/) is a separate release download,
+    # never part of the plugin package (CMakeLists.txt)
+    $StopWatch = Get-ChildItem -Path "${ProjectRoot}/release/${Configuration}" -Recurse -Directory -Filter 'stopwatch'
+    if ( $StopWatch ) {
+        throw "The package contains lua/stopwatch: $($StopWatch.FullName -join ', ')"
+    }
+
     Log-Group "Archiving ${ProductName}..."
     $CompressArgs = @{
         Path = (Get-ChildItem -Path "${ProjectRoot}/release/${Configuration}" -Exclude "${OutputName}*.*")

@@ -1,6 +1,6 @@
 # StopWatch integration
 
-The StopWatch script ([midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua)) works with Lua Bridge from version 6.2. **How to set it up, its settings, and everything it adds** are in StopWatch's own guide: [StopWatch and the Lua Bridge](https://github.com/midnight-studios/obs-lua/blob/main/docs/STOPWATCH-LUABRIDGE.md).
+The StopWatch script works with Lua Bridge from version 6.2, and works the same without it. StopWatch 6.2 is published with Lua Bridge: it is in [`lua/stopwatch/`](../../lua/stopwatch/) in this repository, and each release has it as separate downloads (`StopWatch-6.2.lua`, its guide and its release note). It isn't installed with the plugin: load it in Tools → Scripts like any script. Earlier versions are in [midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua). **How to set it up, its settings, and everything it adds** are in StopWatch's own guide: [StopWatch and the Lua Bridge](../../lua/stopwatch/STOPWATCH-LUABRIDGE.md).
 
 - **The dock:** StopWatch appears as a section in **Docks → Lua Bridge**. For a dock of its own, open **Tools → Lua Bridge** and tick **Dock** next to it (see "A dock per script" in [API.md](../API.md#a-dock-per-script)).
 - **Remote control:** obs-websocket clients address it by its owner, `stopwatch`, as below.

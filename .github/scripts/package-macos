@@ -136,12 +136,18 @@ package() {
     pkgutil --expand-full ${project_root}/release/${output_name}.pkg ${pkg_check}
     local -a pkg_plugins=(${pkg_check}/**/${product_name}.plugin/Contents/MacOS/${product_name}(N))
     local -a pkg_dsyms=(${pkg_check}/**/*.dSYM(N/))
+    # StopWatch (lua/stopwatch/) is a separate release download (CMakeLists.txt)
+    local -a pkg_stopwatch=(${pkg_check}/**/lua/stopwatch(N/))
     if (( ! ${#pkg_plugins} )) {
       log_error "${output_name}.pkg doesn't contain ${product_name}.plugin"
       return 2
     }
     if (( ${#pkg_dsyms} )) {
       log_error "${output_name}.pkg contains debug symbols: ${pkg_dsyms}"
+      return 2
+    }
+    if (( ${#pkg_stopwatch} )) {
+      log_error "${output_name}.pkg contains lua/stopwatch: ${pkg_stopwatch}"
       return 2
     }
     rm -rf ${pkg_check}

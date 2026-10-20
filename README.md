@@ -63,6 +63,11 @@ They ship with the plugin in `lua/examples/`, and are also available on their ow
 - **stopwatch-demo**: a stopwatch controlled from the dock, shown in a text source. A demo of the contract that the
   real [StopWatch](docs/integrations/stopwatch.md) script (6.2 and later) implements; don't run both, since they share
   the owner `stopwatch`.
+
+**StopWatch 6.2,** the full timer script, is published with Lua Bridge: each release has `StopWatch-6.2.lua` and its
+guide as separate downloads (they are in [`lua/stopwatch/`](lua/stopwatch/) here). It works with or without the plugin;
+with it, StopWatch gets a section in the dock and remote control. It isn't installed with the plugin: load it in
+Tools → Scripts. See [StopWatch integration](docs/integrations/stopwatch.md).
 - **ping-pong**: two scripts talking to each other, with commands one way and events back.
 
 ## Using a Stream Deck

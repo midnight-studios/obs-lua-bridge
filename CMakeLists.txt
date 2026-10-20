@@ -78,10 +78,12 @@ set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_nam
 # Ship the Lua helper and examples (lua/) in the plugin's data folder, in the
 # same layout on every platform (<data>/lua/luabridge.lua, <data>/lua/examples/),
 # so the examples' dofile(script_path() .. "../luabridge.lua") works as shipped.
+# lua/stopwatch/ (the StopWatch script) is not installed with the plugin: the
+# release attaches it as separate downloads (.github/workflows/push.yaml).
 # Also ship the license files with the plugin.
 set(_license_files "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" "${CMAKE_CURRENT_SOURCE_DIR}/THIRD-PARTY-NOTICES.md")
 if(OS_WINDOWS)
-  install(DIRECTORY lua/ DESTINATION "${CMAKE_PROJECT_NAME}/data/lua")
+  install(DIRECTORY lua/ DESTINATION "${CMAKE_PROJECT_NAME}/data/lua" PATTERN "stopwatch" EXCLUDE)
   install(FILES ${_license_files} DESTINATION "${CMAKE_PROJECT_NAME}")
   install(FILES packaging/windows/INSTALL.txt DESTINATION .)
   add_custom_command(
@@ -90,11 +92,14 @@ if(OS_WINDOWS)
     COMMAND
       "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lua"
       "${CMAKE_CURRENT_BINARY_DIR}/rundir/$<CONFIG>/${CMAKE_PROJECT_NAME}/lua"
+    COMMAND
+      "${CMAKE_COMMAND}" -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/rundir/$<CONFIG>/${CMAKE_PROJECT_NAME}/lua/stopwatch"
     COMMENT "Copy lua/ to rundir"
     VERBATIM
   )
 elseif(OS_MACOS)
   file(GLOB_RECURSE _lua_files "${CMAKE_CURRENT_SOURCE_DIR}/lua/*")
+  list(FILTER _lua_files EXCLUDE REGEX "/lua/stopwatch/")
   foreach(_file IN LISTS _lua_files)
     cmake_path(RELATIVE_PATH _file BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE _relative)
     cmake_path(GET _relative PARENT_PATH _relative)
@@ -105,7 +110,11 @@ elseif(OS_MACOS)
     target_add_resource(${CMAKE_PROJECT_NAME} "${_file}")
   endforeach()
 else()
-  install(DIRECTORY lua/ DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/obs/obs-plugins/${CMAKE_PROJECT_NAME}/lua")
+  install(
+    DIRECTORY lua/
+    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/obs/obs-plugins/${CMAKE_PROJECT_NAME}/lua"
+    PATTERN "stopwatch" EXCLUDE
+  )
   install(FILES ${_license_files} DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/doc/${CMAKE_PROJECT_NAME}")
 endif()
 

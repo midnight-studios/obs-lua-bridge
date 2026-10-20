@@ -164,6 +164,14 @@ ${_usage_host:-}"
 
   # Always archived as well (Lua Bridge): releases ship the .deb for Ubuntu and
   # the .tar.xz for other distributions (docs/INSTALL.md)
+  # StopWatch (lua/stopwatch/) is a separate release download, never part of
+  # the .deb or the archive (CMakeLists.txt)
+  local -a stopwatch=(${project_root}/release/${config}/**/lua/stopwatch(N/))
+  if (( ${#stopwatch} )) {
+    log_error "The package contains lua/stopwatch: ${stopwatch}"
+    return 2
+  }
+
   log_group "Archiving ${product_name}..."
   local output_name="${product_name}-${product_version}-${target##*-}-ubuntu-gnu"
   local _tarflags='cJf'
