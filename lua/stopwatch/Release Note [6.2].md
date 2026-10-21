@@ -2,6 +2,8 @@
 
 StopWatch is MIT-licensed. Copyright (c) Midnight Studios. Licence text: [lua/LICENSE](https://github.com/midnight-studios/obs-lua-bridge/blob/master/lua/LICENSE) in the Lua Bridge repository.
 
+Paths such as `tests/csct/…`, `tests/obs-auto/` and `docs/investigation/…` refer to StopWatch's private development repository and aren't published.
+
 Changes between `StopWatch-[6.1].lua` (the final 6.1, with the B-078, B-083, B-086 and B-087 fixes) and `StopWatch-[6.2].lua`, for technical review.
 
 **Basis.** The document is built from the actual diff of the final files, `git diff --no-index -w -U0` between the two: 69 hunks. Every hunk is assigned to the entries below:
@@ -243,7 +245,7 @@ All are bug fixes (§3). The integration adds none without the plugin.
 
 ## 5. Known limits
 
-- **D2, macOS / Linux:** finding the helper installed with the plugin (`obs_get_module_data_path`) is tested on Windows only. If the status says the helper is missing, `luabridge.lua` next to the script always works. This is a follow-up for the bridge repository (`docs/LUABRIDGE-FOLLOWUPS.md`).
+- **D2, macOS / Linux:** finding the helper installed with the plugin (`obs_get_module_data_path`) is tested on Windows only. If the status says the helper is missing, `luabridge.lua` next to the script always works. Lua Bridge now documents loading the installed helper, and says it is tested on Windows only so far: "Using the helper installed with the plugin" in its [API.md](https://github.com/midnight-studios/obs-lua-bridge/blob/master/docs/API.md#the-helper-library-luabridgelua).
 - **Two copies with the same Instance ID:** they share the owner. Only one reaches the dock, and the plugin logs "already registered and active". Documented as a user error (§7.12).
 - **B-081, an overtime split without "+":** the split text source shows the elapsed overtime without "+" (as in 6.1), and the split event and `last_split` report it the same way. Decision 2026-10-15: keep it, for a later version.
 - **OBS older than 28:** no Status and Help info texts in the panel. The plugin itself needs OBS 31.1.
