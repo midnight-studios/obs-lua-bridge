@@ -87,11 +87,43 @@ jobs:
           : Package Lua Helper and Examples 🌙
           if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
 
-          # Script authors who only need the helper: lua/ as obs-lua-bridge-lua-<version>/
+          # Script authors who only need the helper: lua/ as obs-lua-bridge-lua-<version>/,
+          # without StopWatch (attached on its own in the next step)
           name="obs-lua-bridge-lua-${GITHUB_REF_NAME}"
           cp -R source/lua "${name}"
+          rm -rf "${name}/stopwatch"
           zip -r -q "${name}.zip" "${name}"
-          rm -rf "${name}" source
+          rm -rf "${name}"
+
+      - name: Package StopWatch ⏱️
+        if: fromJSON(steps.check.outputs.validTag)
+        run: |
+          : Package StopWatch ⏱️
+          if [[ "${RUNNER_DEBUG}" ]]; then set -x; fi
+          shopt -s nullglob
+
+          # StopWatch is not installed with the plugin: its script, its guide and its release
+          # note are separate downloads. GitHub rewrites brackets and spaces in asset names, so
+          # "StopWatch-[6.2].lua" is attached as StopWatch-6.2.lua.
+          scripts=(source/lua/stopwatch/StopWatch-\[*\].lua)
+          if (( ${#scripts[@]} != 1 )); then
+            echo "::error::Expected exactly one StopWatch-[<version>].lua in lua/stopwatch/, found ${#scripts[@]}"
+            exit 1
+          fi
+          sw_version="${scripts[0]##*/StopWatch-[}"
+          sw_version="${sw_version%].lua}"
+          note="source/lua/stopwatch/Release Note [${sw_version}].md"
+          guide="source/lua/stopwatch/STOPWATCH-LUABRIDGE.md"
+          for file in "${note}" "${guide}"; do
+            if [[ ! -f "${file}" ]]; then
+              echo "::error::Missing ${file}"
+              exit 1
+            fi
+          done
+          cp "${scripts[0]}" "StopWatch-${sw_version}.lua"
+          cp "${guide}" "STOPWATCH-LUABRIDGE.md"
+          cp "${note}" "StopWatch-${sw_version}-Release-Note.md"
+          rm -rf source
 
       - name: Download Build Artifacts 📥
         uses: actions/download-artifact@v8
@@ -135,7 +167,7 @@ jobs:
           shopt -s extglob
 
           echo "### Checksums" > ${{ github.workspace }}/CHECKSUMS.txt
-          for file in ${{ github.workspace }}/@(*.exe|*.deb|*.ddeb|*.pkg|*.tar.xz|*.zip); do
+          for file in ${{ github.workspace }}/@(*.exe|*.deb|*.ddeb|*.pkg|*.tar.xz|*.zip|*.lua|*.md); do
             echo "    ${file##*/}: $(sha256sum "${file}" | cut -d " " -f 1)" >> ${{ github.workspace }}/CHECKSUMS.txt
           done
 
@@ -156,3 +188,5 @@ jobs:
             ${{ github.workspace }}/*.deb
             ${{ github.workspace }}/*.ddeb
             ${{ github.workspace }}/*.tar.xz
+            ${{ github.workspace }}/*.lua
+            ${{ github.workspace }}/*.md

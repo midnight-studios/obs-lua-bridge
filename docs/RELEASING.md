@@ -46,10 +46,18 @@
      `obs-lua-bridge-0.9.0-beta2-x86_64-ubuntu-gnu.tar.xz`;
    - `obs-lua-bridge-0.9.0-beta2-source.tar.xz`: the complete source, which the GPL requires us to offer;
    - `obs-lua-bridge-lua-0.9.0-beta2.zip`: only the Lua helper and examples;
+   - **StopWatch,** from `lua/stopwatch/`, as separate downloads: `StopWatch-6.2.lua` (the script),
+     `STOPWATCH-LUABRIDGE.md` (its guide) and `StopWatch-6.2-Release-Note.md`. The names lose the brackets and
+     spaces of the repository's files, which GitHub would rewrite. The version comes from the file name
+     `StopWatch-[<version>].lua`; the job fails unless there is exactly one, with its release note and guide.
+     StopWatch is never inside a plugin package or the helper zip; packaging fails if it is;
    - checksums in the release text.
 5. **Check the draft:**
    - download the Windows zip and install it as `docs/INSTALL.md` says;
-   - start OBS and check that the log says `version 0.9.0-beta2` and that the dock appears.
+   - start OBS and check that the log says `version 0.9.0-beta2` and that the dock appears;
+   - check that the plugin packages and the helper zip have no `stopwatch` folder, and that `StopWatch-6.2.lua`
+     has the same content as `lua/stopwatch/StopWatch-[6.2].lua` on the tagged commit (`git hash-object` of the
+     download equals `git rev-parse <tag>:"lua/stopwatch/StopWatch-[6.2].lua"`); load it in OBS once.
 6. **Write the release text** from `docs/RELEASE-NOTES-TEMPLATE.md`. Keep its policy statements (not an OBS
    Project product, AI usage, reporting bugs). It brings together:
    - the CHANGELOG section for this version;
@@ -64,5 +72,7 @@ Nothing is public until step 7. To retract a draft before publishing, delete it 
 - [ ] CI green on `master`, including the unit tests on all three platforms
 - [ ] `docs/TESTING.md` suites run on the release candidate; at least the websocket suite and a Windows install test
 - [ ] `CHANGELOG.md` updated, and the tag equals `buildspec.json`'s version
+- [ ] If StopWatch changed: the new `StopWatch-[<version>].lua` replaced the old one in `lua/stopwatch/` (exactly
+      one script there), with its `Release Note [<version>].md` and an updated `STOPWATCH-LUABRIDGE.md`
 - [ ] The minimum OBS version in `docs/INSTALL.md` is still right (`buildspec.json` → `obs-studio` version)
 - [ ] For the first public release: `docs/LAUNCH-CHECKLIST.md` completed

@@ -33,8 +33,13 @@ All notable changes to Lua Bridge. Versions follow
   plugin. Scripts that ship their own copy of 1.0.0 keep working unchanged.
 
 ### StopWatch
-- StopWatch 6.2 ([midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua)) implements the Lua Bridge
-  contract. `docs/integrations/stopwatch.md` now describes what the real script does (reset to the start time,
+- **StopWatch 6.2 is published with Lua Bridge,** in `lua/stopwatch/` (MIT, like the rest of `lua/`), with its
+  guide (`STOPWATCH-LUABRIDGE.md`) and its release note. It works with or without the plugin. It isn't installed
+  with the plugin: each release attaches `StopWatch-6.2.lua`, `STOPWATCH-LUABRIDGE.md` and
+  `StopWatch-6.2-Release-Note.md` as separate downloads, and packaging fails if `lua/stopwatch/` ever ends up in a
+  plugin package or in the helper zip. Earlier versions stay in
+  [midnight-studios/obs-lua](https://github.com/midnight-studios/obs-lua).
+- StopWatch 6.2 implements the Lua Bridge contract. `docs/integrations/stopwatch.md` now describes what the real script does (reset to the start time,
   `elapsed` while counting down, `display` always `HH:MM:SS`), links StopWatch's own guide, and says where its
   docks are. `stopwatch-demo.lua` stays as a demo; don't run both, since they share the owner `stopwatch`.
 - `tests/websocket/test_examples.py` runs the Stopwatch tests whenever the owner `stopwatch` is registered, without

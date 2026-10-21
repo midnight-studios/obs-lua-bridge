@@ -8,6 +8,11 @@ examples/       Ready-to-run example scripts:
                   stopwatch-demo.lua  a stopwatch controlled from the dock
                   ping-pong/          two scripts talking to each other
                                       (load ping.lua and pong.lua; see its README.md)
+stopwatch/      StopWatch 6.2, the full timer script, with its guide
+                (STOPWATCH-LUABRIDGE.md) and release note. In the repository
+                and as separate release downloads only: it isn't installed
+                with the plugin or included in the helper zip. It works with
+                or without the plugin.
 
 Try the examples
 ----------------
@@ -29,6 +34,7 @@ API reference: https://github.com/midnight-studios/obs-lua-bridge/blob/master/do
 
 License
 -------
-The files in this folder are MIT-licensed (see LICENSE here), so you can copy
-luabridge.lua into scripts under any license. The Lua Bridge plugin itself is
+The files in this folder, StopWatch in stopwatch/ included, are MIT-licensed
+(see LICENSE here), so you can copy luabridge.lua into scripts under any
+license. The Lua Bridge plugin itself is
 GPL-2.0-or-later.
