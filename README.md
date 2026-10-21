@@ -102,7 +102,9 @@ report and pull request before merging, and tested the plugin in OBS on Windows.
 **Review and testing:** CI builds on Windows, macOS and Ubuntu and runs the unit tests on every pull request, and
 changes merge only when CI passes. Before the first beta (0.9.0-beta1), the plugin was also tested on Windows
 with fuzzing, a 1-hour stress test, an 8-hour soak, shutdowns with commands in flight, and scene collection and
-profile switching; those runs haven't been repeated for 0.9.0-beta2. It hasn't been tested on a real Mac yet.
+profile switching. For 0.9.0-beta2, the stress test, a 2-hour soak and the shutdowns with commands in flight
+were run again on Windows, StopWatch 6.2 was tested against the plugin, and the per-script docks were tested
+through the OBS window on OBS 31.1.2, 32.2.2 and 33.0.0-rc2. It hasn't been tested on a real Mac yet.
 
 ## Reporting bugs
 [Open an issue](https://github.com/midnight-studios/obs-lua-bridge/issues/new/choose) on GitHub. The bug report
